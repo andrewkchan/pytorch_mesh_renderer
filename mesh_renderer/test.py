@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import math
 import os
+import unittest
 
 import numpy as np
 import torch
@@ -11,7 +12,6 @@ import torch
 import camera_utils
 import mesh_renderer
 import test_utils
-import unittest
 
 
 class RenderTest(unittest.TestCase):
@@ -227,7 +227,7 @@ class RenderTest(unittest.TestCase):
 
         jacobians_match = torch.autograd.gradcheck(
             render_complex_cube,
-            self.cube_triangles,
+            self.cube_vertices,
             eps=1e-3,
             atol=0.1,
             rtol=0.01)
