@@ -133,3 +133,34 @@ def perspective(aspect_ratio, fov_y, near_clip, far_clip):
         ], axis=0)
     perspective_transform = torch.reshape(perspective_transform, [4, 4, -1])
     return torch.transpose(perspective_transform, [2, 0, 1])
+
+
+def transform_homogeneous(matrices, vertices):
+    """Applies batched 4x4 homogeneous matrix transforms to 3D vertices.
+
+    The vertices are input and output as row-major, but are interpreted as
+    column vectors multiplied on the right-hand side of the matrices. More
+    explicitly, this function computes (MV^T)^T.
+    Vertices are assumed to be xyz, and are extended to xyzw with w=1.
+
+    Args:
+        matrices: a [batch_size, 4, 4] tensor of matrices.
+        vertices: a [batch_size, N, 3] tensor of xyz vertices.
+
+    Returns:
+        a [batch_size, N , 4] tensor of xyzw vertices.
+
+    Raises:
+        ValueError: if matrices or vertices have the wrong number of dimensions.
+    """
+    if len(matrices.shape) != 3:
+        raise ValueError(
+            "matrices must have 3 dimensions (missing batch dimension?)")
+    if len(vertices.shape) != 3:
+        raise ValueError(
+            "vertices must have 3 dimensions (missing batch dimension?)")
+    homogeneous_coord = torch.ones(
+        [vertices.shape[0], vertices.shape[1], 1], dtype=torch.float32)
+    vertices_homogeneous = torch.cat([vertices, homogeneous_coord], 2)
+
+    return torch.matmul(vertices_homogeneous, matrices.transpose())
