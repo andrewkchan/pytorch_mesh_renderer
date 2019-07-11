@@ -192,4 +192,191 @@ def mesh_renderer(
         clip_space_transforms, image_width, image_height,
         [-1] * vertex_attributes.shape[2])
 
-    #################
+    # Extract the interpolated vertex attributes from the pixel buffer and
+    # supply them to the shader:
+    pixel_normals = torch.nn.functional.normalize(
+        pixel_attributes[:, :, :, 0:3], p=2, dim=3)
+    pixel_positions = pixel_attributes[:, :, :, 3:6]
+    diffuse_colors = pixel_attributes[:, :, :, 6:9]
+    if specular_colors is not None:
+        specular_colors = pixel_attributes[:, :, :, 9:12]
+        # Retrieve the interpolated shininess coefficients if necessary, or just
+        # reshape our input for broadcasting:
+        if len(shininess_coefficients.shape) == 2:
+            shininess_coefficients = pixel_attributes[:, :, :, 12]
+        else:
+            shininess_coefficients = torch.reshape(
+                shininess_coefficients, [-1, 1, 1])
+
+    pixel_mask = (diffuse_colors >= 0.0).reduce(dim=3).type(torch.float32)
+
+    renders = phong_shader(
+        normals=pixel_normals,
+        alphas=pixel_mask,
+        pixel_positions=pixel_positions,
+        light_positions=light_positions,
+        light_intensities=light_intensities,
+        diffuse_colors=diffuse_colors,
+        camera_position=camera_position if specular_colors is not None else None,
+        specular_colors=specular_colors,
+        shininess_coefficients=shininess_coefficients,
+        ambient_color=ambient_color)
+    return renders
+
+
+def phong_shader(normals,
+                 alphas,
+                 pixel_positions,
+                 light_positions,
+                 light_intensities,
+                 diffuse_colors=None,
+                 camera_position=None,
+                 specular_colors=None,
+                 shininess_coefficients=None,
+                 ambient_color=None):
+    """Compute pixelwise lighting from rasterized buffers with the Phong model.
+
+    Args:
+        normals: a 4D float32 tensor with shape [batch_size, image_height,
+            image_width, 3]. The inner dimension is the world space XYZ normal
+            for the corresponding pixel. Should be already normalized.
+        alphas: a 3D float32 tensor with shape [batch_size, image_height,
+            image_width]. The inner dimension is the alpha value (transparency)
+            for the corresponding pixel.
+        pixel_positions: a 4D float32 tensor with shape [batch_size,
+            image_height, image_width, 3]. The inner dimension is the world
+            space XYZ position for the corresponding pixel.
+        light_positions: a 3D tensor with shape [batch_size, light_count, 3].
+            The XYZ position of each light in the scene. In the same coordinate
+            space as pixel_positions.
+        light_intensities: a 3D tensor with shape [batch_size, light_count, 3].
+            The RGB intensity values for each light. Intensities may be above 1.
+        diffuse_colors: a 4D float32 tensor with shape [batch_size, image_height,
+            image_width, 3]. The inner dimension is the diffuse RGB coefficients
+            at a pixel in the range [0, 1].
+        camera_position: a 1D tensor with shape [batch_size, 3]. The XYZ camera
+            position in the scene. If supplied, specular reflections will be
+            computed. If not supplied, specular_colors and shininess_coefficients
+            are expected to be None. In the same coordinate space as
+            pixel_positions.
+        specular_colors: a 4D float32 tensor with shape [batch_size,
+            image_height, image_width, 3]. The inner dimension is the specular
+            RGB coefficients at a pixel in the range [0, 1]. If None, assumed
+            to be torch.zeros().
+        shininess_coefficients: a 3D float32 tensor that is broadcasted to
+            shape [batch_size, image_height, image_width]. The inner dimension
+            is the shininess coefficient for the object at a pixel. Dimensions
+            that are constant can be given length 1, so [batch_size, 1, 1] and
+            [1, 1, 1] are also valid input shapes.
+        ambient_color: a 2D tensor with shape [batch_size, 3]. The RGB ambient
+            color, which is added to each pixel before tone mapping. If None,
+            it is assumed to be torch.zeros().
+
+    Returns:
+        A 4D float32 tensor of shape [batch_size, image_height, image_width, 4]
+        containing the lit RGBA color values for each image at each pixel.
+        Colors are in the range [0, 1].
+
+    Raises:
+        ValueError: An invalid argument to the method is detected.
+    """
+    batch_size, image_height, image_width = [s.value for s in normals.shape[:-1]]
+    light_count = light_positions.shape[1]
+    pixel_count = image_height * image_width
+    # Reshape all values to easily do pixelwise computations:
+    normals = torch.reshape(normals, [batch_size, -1, 3])
+    alphas = torch.reshape(alphas, [batch_size, -1, 1])
+    diffuse_colors = torch.reshape(diffuse_colors, [batch_size, -1, 3])
+    if camera_position is not None:
+        specular_colors = torch.reshape(specular_colors, [batch_size, -1, 3])
+
+    # Ambient component
+    output_colors = torch.zeros([batch_size, image_height * image_width, 3])
+    if ambient_color is not None:
+        ambient_reshaped = torch.unsqueeze(ambient_color, 1)
+        output_colors = output_colors + ambient_reshaped * diffuse_colors
+
+    # Diffuse component
+    pixel_positions = torch.reshape(pixel_positions, [batch_size, -1, 3])
+    per_light_pixel_positions = torch.stack(
+        [pixel_positions] * light_count,
+        dim=1) # [batch_size, light_count, pixel_count, 3]
+    directions_to_lights = torch.nn.functional.normalize(
+        torch.unsqueeze(light_positions, 2) - per_light_pixel_positions,
+        p=2,
+        dim=3) # [batch_size, light_count, pixel_count, 3]
+    # The specular component should only contribute when the light and normal
+    # face one another (i.e. the dot product is nonnegative):
+    normals_dot_lights = torch.clamp(
+        torch.sum(
+            torch.unsqueeze(normals, 1) * directions_to_lights, dim=3),
+        0.0, 1.0) # [batch_size, light_count, pixel_count]
+    diffuse_output = (
+        torch.unsqueeze(diffuse_colors, 1) *
+        torch.unsqueeze(normals_dot_lights, 3) *
+        torch.unsqueeze(light_intensities, 2))
+    diffuse_output = torch.sum(diffuse_output, dim=1) # [batch_size, pixel_count, 3]
+    output_colors = output_colors + diffuse_output
+
+    # Specular component
+    if camera_position is not None:
+        camera_position = torch.reshape(camera_position, [batch_size, 1, 3])
+        mirror_reflection_direction = torch.nn.functional.normalize(
+            2.0 * torch.unsqueeze(normals_dot_lights, 3) * torch.unsqueeze(
+                normals, 1) - directions_to_lights,
+            p=2,
+            dim=3) # [batch_size, light_count, pixel_count, 3]
+        direction_to_camera = torch.nn.normalize(
+            camera_position - pixel_positions,
+            p=2,
+            dim=2) # [batch_size, pixel_count, 3]
+        reflection_direction_dot_camera_direction = torch.sum(
+            mirror_reflection_direction * torch.unsqueeze(direction_to_camera, 1),
+            dim=3),
+        # The specular component should only contribute when the reflection is
+        # external:
+        reflection_direction_dot_camera_direction = torch.clamp(
+            torch.nn.functional.normalize(
+                reflection_direction_dot_camera_direction,
+                p=2,
+                dim=2),
+            0.0,
+            1.0)
+        # The specular component should also only contribute when the diffuse
+        # component contributes:
+        reflection_direction_dot_camera_direction = torch.where(
+            normals_dot_lights != 0.0,
+            reflection_direction_dot_camera_direction,
+            torch.zeros_like(
+                reflection_direction_dot_camera_direction,
+                dtype=torch.float32))
+        # Reshape to support broadcasting the shininess coefficient, which
+        # rarely varies per-vertex:
+        reflection_direction_dot_camera_direction = torch.reshape(
+            reflection_direction_dot_camera_direction,
+            [batch_size, light_count, image_height, image_width])
+        shininess_coefficients = torch.unsqueeze(shininess_coefficients, 1)
+        specularity = torch.reshape(
+            torch.pow(reflection_direction_dot_camera_direction,
+                      shininess_coefficients),
+            [batch_size, light_count, pixel_count, 1])
+        specular_output = (
+            torch.unsqueeze(specular_colors, 1) * specularity *
+            torch.unsqueeze(light_intensities, 2)
+        )
+        specular_output = torch.sum(specular_output, dim=1)
+        output_colors = output_colors + specular_output
+    rgb_images = torch.reshape(
+        output_colors,
+        [batch_size, image_height, image_width, 3])
+    alpha_images = torch.reshape(
+        alphas,
+        [batch_size, image_height, image_width, 1])
+    valid_rgb_values = torch.cat(3 * [alpha_images > 0.5], dim=3)
+    rgb_images = torch.where(
+        valid_rgb_values,
+        rgb_images,
+        torch.zeros_like(rgb_images, dtype=torch.float32))
+    return torch.reverse(
+        torch.cat([rgb_images, alpha_images], dim=3),
+        dims=[1])
