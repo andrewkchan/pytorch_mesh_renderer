@@ -380,3 +380,36 @@ def phong_shader(normals,
     return torch.reverse(
         torch.cat([rgb_images, alpha_images], dim=3),
         dims=[1])
+
+
+def tone_mapper(image, gamma):
+    """Apply gamma correction to the input image.
+
+    Tone maps the input image batch in order to make scenes with a high dynamic
+    range viewable. The gamma correction factor is computed separately per
+    image, but is shared between all provided channels. The exact function
+    computed is:
+
+    image_out = A*image_in^gamma, where A is an image-wide constant computed
+    so that the maximum image value is approximately 1. The correction is
+    applied to all channels.
+
+    Args:
+        image: 4D float32 tensor with shape [batch_size, image_height,
+            image_width, channel_count]. The batch of images to tone map.
+        gamma: 0D float32 nonnegative tensor. Values of gamma below 1 compress
+            relative contrast in the image, and values above one increase it.
+            A value of 1 is equivalent to scaling the image to have a max value
+            of 1.
+    Returns:
+        4D float32 tensor with shape [batch_size, image_height, image_width,
+        channel_count]. Contains the gamma-corrected images, clipped to the
+        range [0, 1].
+    """
+    batch_size = image.shape[0]
+    corrected_image = torch.pow(image, gamma)
+    image_max = torch.max(
+        torch.reshape(corrected_image, [batch_size, -1]), 1).values
+    scaled_image = (
+        corrected_image / torch.reshape(image_max, [batch_size, 1, 1, 1]))
+    return torch.clamp(scaled_image, 0.0, 1.0)
