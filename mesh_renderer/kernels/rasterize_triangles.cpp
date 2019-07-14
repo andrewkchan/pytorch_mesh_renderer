@@ -4,6 +4,22 @@
 
 #include <torch/extension.h>
 
+namespace {
+
+  // Threshold for a barycentric coordinate triplet's sum, below which the
+  // coordinates at a pixel are deemed degenerate. Most such degenerate
+  // triplets in an image will be exactly zero, as this is how pixels outside
+  // the mesh are rendered.
+  constexpr float kDegenerateBarycentricCoordinatesCutoff = 0.9f;
+
+  // If the area of a triangle is very small in screen space, the corner
+  // vertices are approaching colinearity, and we should drop the gradient
+  // to avoid numerical instability (in particular, blowup, as the forward
+  // pass computation already only has 8 bits of precision).
+  constexpr float kMinimumTriangleArea = 1e-13;
+   
+}
+
 // Takes the maximum of a, b, and c, rounds up, and converts to an integer
 // in the range [low, high].
 inline int clamped_integer_max(float a, float b, float c, int low, int high) {
@@ -85,6 +101,10 @@ bool pixel_is_inside_triangle(const float edge_values[3]) {
          (edge_values[0] > 0 || edge_values[1] > 0 || edge_values[2] > 0);
 }
 
+std::vector<torch::Tensor> rasterize_triangles_backward() {
+  return {}; // TODO.
+}
+
 // Compute the triangle id, barycentric coordinates, and z-buffer at each pixel
 // in the image.
 //
@@ -100,16 +120,16 @@ bool pixel_is_inside_triangle(const float edge_values[3]) {
 // triangle_count: The number of triangles stored in the array triangles.
 //
 // Returns:
-// px_triangle_ids: A flattened 2D array with image_height*image_width elements.
+// px_triangle_ids: A 2D tensor with shape {image_height, image_width}.
 //   At return, each pixel contains a triangle id in the range
 //   [0, triangle_count). The id value is also 0 if there is no triangle
 //   at the pixel. The px_barycentric_coordinates must be checked to distinguish
 //   between the two cases.
-// px_barycentric_coordinates: A flattened 3D array with
-//   image_height*image_width*3 elements. At return, contains the triplet of
+// px_barycentric_coordinates: A 3D tensor with
+//   shape {image_height, image_width, 3}. At return, contains the triplet of
 //   barycentric coordinates at each pixel in the same vertex ordering as
 //   triangles. If no triangle is present, all coordinates are 0.
-// z_buffer: A flattened 2D array with image_height*image_width elements. At
+// z_buffer: A 2D tensor with shape {image_height, image_width} elements. At
 //   return, contains the normalized device Z coordinates of the rendered
 //   triangles.
 std::vector<torch::Tensor> rasterize_triangles_forward(
@@ -117,15 +137,21 @@ std::vector<torch::Tensor> rasterize_triangles_forward(
   const torch::Tensor &triangles,
   int triangle_count,
   int image_width,
-  int image_height,
-  torch::Tensor px_triangle_ids,
-  torch::Tensor px_barycentric_coordinates,
-  torch::Tensor z_buffer
+  int image_height
 ) {
   const float half_image_width = 0.5 * image_width;
   const float half_image_height = 0.5 * image_height;
   float unnormalized_matrix_inverse[9];
   float b_over_w[3];
+  auto px_triangle_ids = torch::zeros(
+    {image_height, image_width},
+    torch::TensorOptions().dtype(torch::kInt32));
+  auto px_barycentric_coords = torch::zeros(
+    {image_height, image_width, 3},
+    torch::TensorOptions().dtype(torch::kFloat32).requires_grad(true));
+  auto z_buffer = torch::ones(
+    {image_height, image_width},
+    torch::TensorOptions().dtype(torch::kFloat32));
 
   auto vertices_a = vertices.accessor<float, 2>();
   auto triangles_a = triangles.accessor<int, 2>();
@@ -217,4 +243,10 @@ std::vector<torch::Tensor> rasterize_triangles_forward(
       }
     }
   }
+
+  return {
+    px_triangle_ids,
+    px_barycentric_coordinates,
+    z_buffer
+  };
 }
