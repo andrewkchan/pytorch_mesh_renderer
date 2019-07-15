@@ -9,7 +9,8 @@ import numpy as np
 import torch
 
 import camera_utils
-import rasterize_triangles
+from rasterize_triangles import RasterizeFunction
+import rasterize_triangles_cpp
 import test_utils
 
 
@@ -56,7 +57,7 @@ class RenderTest(unittest.TestCase):
         triangles = torch.tensor([[0, 1, 2]], dtype=torch.int32)
 
         image, _, _ = (
-            rasterize_triangles.rasterize_triangles_module.rasterize_triangles(
+            rasterize_triangles_cpp.forward(
                 clip_coordinates,
                 triangles,
                 self.image_width,
@@ -98,7 +99,7 @@ class RenderTest(unittest.TestCase):
         projection = torch.cat([projection_1, projection_2], axis=0)
         background_value = [0., 0., 0., 0.]
 
-        rendered = rasterize_triangles.rasterize(
+        rendered = RasterizeFunction.apply(
             torch.stack([self.cube_vertex_positions,
                          self.cube_vertex_positions]),
             torch.stack([vertex_rgba, vertex_rgba]),
@@ -130,7 +131,7 @@ class RenderTest(unittest.TestCase):
 
         def rasterize_test_pixels(clip_coordinates):
             barycentric_coordinates, _, _ = (
-                rasterize_triangles.rasterize_triangles_module.rasterize_triangles(
+                rasterize_triangles_cpp.forward(
                     clip_coordinates,
                     triangles,
                     self.image_width,
@@ -164,7 +165,7 @@ class RenderTest(unittest.TestCase):
 
         def get_barycentric_coordinates(clip_coordinates):
             barycentric_coordinates, _, _ = (
-                rasterize_triangles.rasterize_triangles_module.rasterize_triangles(
+                rasterize_triangles_cpp.forward(
                     clip_coordinates,
                     self.cube_triangles,
                     image_width,

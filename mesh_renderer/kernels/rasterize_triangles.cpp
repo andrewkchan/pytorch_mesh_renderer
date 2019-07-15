@@ -17,7 +17,7 @@ namespace {
   // to avoid numerical instability (in particular, blowup, as the forward
   // pass computation already only has 8 bits of precision).
   constexpr float kMinimumTriangleArea = 1e-13;
-   
+
 }
 
 // Takes the maximum of a, b, and c, rounds up, and converts to an integer
@@ -249,4 +249,9 @@ std::vector<torch::Tensor> rasterize_triangles_forward(
     px_barycentric_coordinates,
     z_buffer
   };
+}
+
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
+  m.def("forward", &rasterize_triangles_forward, "Rasterize forward");
+  m.def("backward", &rasterize_triangles_backward, "Rasterize backward");
 }

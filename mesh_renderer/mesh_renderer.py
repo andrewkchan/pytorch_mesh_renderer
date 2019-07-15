@@ -7,7 +7,7 @@ from __future__ import print_function
 import torch
 
 import camera_utils
-import rasterize_triangles
+from rasterize_triangles import RasterizeFunction
 
 
 def mesh_renderer(
@@ -187,7 +187,7 @@ def mesh_renderer(
 
     clip_space_transforms = torch.matmul(perspective_transforms, camera_matrices)
 
-    pixel_attributes = rasterize_triangles.rasterize(
+    pixel_attributes = RasterizeFunction.apply(
         vertices, vertex_attributes, triangles, triangles,
         clip_space_transforms, image_width, image_height,
         [-1] * vertex_attributes.shape[2])
