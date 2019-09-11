@@ -12,12 +12,6 @@ namespace {
   // the mesh are rendered.
   constexpr float kDegenerateBarycentricCoordinatesCutoff = 0.9f;
 
-  // If the area of a triangle is very small in screen space, the corner
-  // vertices are approaching colinearity, and we should drop the gradient
-  // to avoid numerical instability (in particular, blowup, as the forward
-  // pass computation already only has 8 bits of precision).
-  constexpr float kMinimumTriangleArea = 1e-13;
-
 }
 
 // Takes the maximum of a, b, and c, rounds up, and converts to an integer
@@ -64,7 +58,7 @@ void compute_edge_functions(const float px, const float py,
 // to the sign. This in turn means we can avoid cracks in rasterization without
 // using fixed-point arithmetic.
 // See http://mathworld.wolfram.com/MatrixInverse.html
-void compute_unnormalized_matrix_inverse(
+float compute_unnormalized_matrix_inverse(
   const float a11, const float a12, const float a13,
   const float a21, const float a22, const float a23,
   const float a31, const float a32, const float a33, float m_inv[9]) {
@@ -88,6 +82,8 @@ void compute_unnormalized_matrix_inverse(
       m_inv[i] = -m_inv[i];
     }
   }
+
+  return det;
 }
 
 // Determine whether the point p lies inside a front-facing triangle.
@@ -101,23 +97,199 @@ bool pixel_is_inside_triangle(const float edge_values[3]) {
          (edge_values[0] > 0 || edge_values[1] > 0 || edge_values[2] > 0);
 }
 
-std::vector<torch::Tensor> rasterize_triangles_backward() {
-  return {}; // TODO.
+// Compute df_dvertices, the derivative of a scalar loss function with respect
+// to the vector of stacked vertex coordinates in XYZW clip space.
+//
+// Params:
+// df_dbarycentric_coords: A 3D float32 tensor with shape
+//  {image_height, image_width, 3}. The element at index [y, x, b] gives the
+//  partial derivative of the scalar loss function with respect to the bth
+//  barycentric coordinate of pixel coordinate (y, x).
+// vertices: A 2D float32 tensor with shape {vertex_count, 4}.
+//   Each quadtruplet is the XYZW location of the vertex with that
+//   triplet's id. The coordinates are assumed to be OpenGL-style clip-space
+//   (i.e., post-projection, pre-divide), where X points right, Y points up,
+//   Z points away. Note Z here is the clip-space (z-buffer) depth and W is the
+//   world space depth.
+// triangles: A 2D int32 tensor with shape {triangle_count, 3}.
+//   Each triplet is the three vertex ids indexing into vertices
+//   describing one triangle with clockwise winding.
+// px_triangle_ids: A 2D tensor with shape {image_height, image_width}.
+//   At return, each pixel contains a triangle id in the range
+//   [0, triangle_count). The id value is also 0 if there is no triangle
+//   at the pixel. The px_barycentric_coordinates must be checked to distinguish
+//   between the two cases.
+// px_barycentric_coordinates: A 3D tensor with
+//   shape {image_height, image_width, 3}. At return, contains the triplet of
+//   barycentric coordinates at each pixel in the same vertex ordering as
+//   triangles. If no triangle is present, all coordinates are 0.
+//
+// Returns:
+// df_dvertices: A 2D tensor with shape {vertex_count, 4} giving the derivative
+//  of the scalar loss function f with respect to the vector of stacked vertex
+//  coordinates in XYZW clip space.
+std::vector<torch::Tensor> rasterize_triangles_backward(
+  const torch::Tensor &df_dbarycentric_coords,
+  const torch::Tensor &vertices,
+  const torch::Tensor &triangles,
+  const torch::Tensor &px_triangle_ids,
+  const torch::Tensor &px_barycentric_coords
+) {
+  const int triangle_count = (int) triangles.size(0);
+  const int vertex_count = (int) vertices.size(0);
+  const int image_height = px_triangle_ids.size(0);
+  const int image_width = px_triangle_ids.size(1);
+  const float half_image_height = 0.5 * image_height;
+  const float half_image_width = 0.5 * image_width;
+  float unnormalized_matrix_inverse[9];
+
+  auto df_dvertices = torch::zeros(
+    {vertex_count, 4},
+    torch::TensorOptions().dtype(torch::kFloat32));
+
+  auto df_dbarycentric_coords_a = df_dbarycentric_coords.accessor<float, 3>();
+  auto vertices_a = vertices.accessor<float, 2>();
+  auto triangles_a = triangles.accessor<int, 2>();
+  auto px_triangle_ids_a = px_triangle_ids.accessor<int, 2>();
+  auto px_barycentric_coordinates_a =
+    px_barycentric_coordinates.accessor<float, 3>();
+  auto df_dvertices_a = df_dvertices.accessor<float, 5>();
+
+  for (int iy = 0; iy < image_height; ++iy) {
+    for (int ix = 0; ix < image_width; ++ix) {
+      int triangle_id = px_triangle_ids_a[iy][ix];
+      const float b0 = px_barycentric_coords_a[iy][ix][0];
+      const float b1 = px_barycentric_coords_a[iy][ix][1];
+      const float b2 = px_barycentric_coords_a[iy][ix][2];
+      if (triangle_id == 0 && b0 + b1 + b2 < kDegenerateBarycentricCoordinatesCutoff) {
+        continue;
+      }
+
+      const int v0_id = triangles_a[triangle_id][0];
+      const int v1_id = triangles_a[triangle_id][1];
+      const int v2_id = triangles_a[triangle_id][2];
+
+      const float v0x = vertices_a[v0_id][0];
+      const float v0y = vertices_a[v0_id][1];
+      const float v0w = vertices_a[v0_id][3];
+      const float v1x = vertices_a[v1_id][0];
+      const float v1y = vertices_a[v1_id][1];
+      const float v1w = vertices_a[v1_id][3];
+      const float v2x = vertices_a[v2_id][0];
+      const float v2y = vertices_a[v2_id][1];
+      const float v2w = vertices_a[v2_id][3];
+
+      const float px = ((ix + 0.5) / half_image_width) - 1.0;
+      const float py = ((iy + 0.5) / half_image_height) - 1.0;
+
+      const float abs_det = std::abs(
+        compute_unnormalized_matrix_inverse(
+          v0x, v1x, v2x,
+          v0y, v1y, v2y,
+          v0w, v1w, v2w,
+          unnormalized_matrix_inverse));
+
+      const float m_inv_d_dx = (
+        unnormalized_matrix_inverse[0] +
+        unnormalized_matrix_inverse[3] +
+        unnormalized_matrix_inverse[6]);
+      const float m_inv_d_dy = (
+        unnormalized_matrix_inverse[1] +
+        unnormalized_matrix_inverse[4] +
+        unnormalized_matrix_inverse[7]);
+      const float m_inv_d_dw = (
+        unnormalized_matrix_inverse[2] +
+        unnormalized_matrix_inverse[5] +
+        unnormalized_matrix_inverse[8]);
+
+      // All of the below derivatives need to be normalized by abs_det.
+
+      const float db0_dx0 = (-unnormalized_matrix_inverse[0]) * b0 + m_inv_d_dx * b0 * b0;
+      const float db0_dx1 = (-unnormalized_matrix_inverse[0]) * b1 + m_inv_d_dx * b0 * b1;
+      const float db0_dx2 = (-unnormalized_matrix_inverse[0]) * b2 + m_inv_d_dx * b0 * b2;
+      const float db0_dy0 = (-unnormalized_matrix_inverse[1]) * b0 + m_inv_d_dy * b0 * b0;
+      const float db0_dy1 = (-unnormalized_matrix_inverse[1]) * b1 + m_inv_d_dy * b0 * b1;
+      const float db0_dy2 = (-unnormalized_matrix_inverse[1]) * b2 + m_inv_d_dy * b0 * b2;
+      const float db0_dw0 = (-unnormalized_matrix_inverse[2]) * b0 + m_inv_d_dw * b0 * b0;
+      const float db0_dw1 = (-unnormalized_matrix_inverse[2]) * b1 + m_inv_d_dw * b0 * b1;
+      const float db0_dw2 = (-unnormalized_matrix_inverse[2]) * b2 + m_inv_d_dw * b0 * b2;
+
+      const float db1_dx0 = (-unnormalized_matrix_inverse[3]) * b0 + m_inv_d_dx * b1 * b0;
+      const float db1_dx1 = (-unnormalized_matrix_inverse[3]) * b1 + m_inv_d_dx * b1 * b1;
+      const float db1_dx2 = (-unnormalized_matrix_inverse[3]) * b2 + m_inv_d_dx * b1 * b2;
+      const float db1_dy0 = (-unnormalized_matrix_inverse[4]) * b0 + m_inv_d_dy * b1 * b0;
+      const float db1_dy1 = (-unnormalized_matrix_inverse[4]) * b1 + m_inv_d_dy * b1 * b1;
+      const float db1_dy2 = (-unnormalized_matrix_inverse[4]) * b2 + m_inv_d_dy * b1 * b2;
+      const float db1_dw0 = (-unnormalized_matrix_inverse[5]) * b0 + m_inv_d_dw * b1 * b0;
+      const float db1_dw1 = (-unnormalized_matrix_inverse[5]) * b1 + m_inv_d_dw * b1 * b1;
+      const float db1_dw2 = (-unnormalized_matrix_inverse[5]) * b2 + m_inv_d_dw * b1 * b2;
+
+      const float db2_dx0 = (-unnormalized_matrix_inverse[6]) * b0 + m_inv_d_dx * b2 * b0;
+      const float db2_dx1 = (-unnormalized_matrix_inverse[6]) * b1 + m_inv_d_dx * b2 * b1;
+      const float db2_dx2 = (-unnormalized_matrix_inverse[6]) * b2 + m_inv_d_dx * b2 * b2;
+      const float db2_dy0 = (-unnormalized_matrix_inverse[7]) * b0 + m_inv_d_dy * b2 * b0;
+      const float db2_dy1 = (-unnormalized_matrix_inverse[7]) * b1 + m_inv_d_dy * b2 * b1;
+      const float db2_dy2 = (-unnormalized_matrix_inverse[7]) * b2 + m_inv_d_dy * b2 * b2;
+      const float db2_dw0 = (-unnormalized_matrix_inverse[8]) * b0 + m_inv_d_dw * b2 * b0;
+      const float db2_dw1 = (-unnormalized_matrix_inverse[8]) * b1 + m_inv_d_dw * b2 * b1;
+      const float db2_dw2 = (-unnormalized_matrix_inverse[8]) * b2 + m_inv_d_dw * b2 * b2;
+
+      df_dvertices_a[v0_id][0] += (
+        df_dbarycentric_coords_a[iy][ix][0] * db0_dx0 +
+        df_dbarycentric_coords_a[iy][ix][1] * db1_dx0 +
+        df_dbarycentric_coords_a[iy][ix][2] * db2_dx0) / abs_det;
+      df_dvertices_a[v0_id][1] += (
+        df_dbarycentric_coords_a[iy][ix][0] * db0_dy0 +
+        df_dbarycentric_coords_a[iy][ix][1] * db1_dy0 +
+        df_dbarycentric_coords_a[iy][ix][2] * db2_dy0) / abs_det;
+      df_dvertices_a[v0_id][3] += (
+        df_dbarycentric_coords_a[iy][ix][0] * db0_dw0 +
+        df_dbarycentric_coords_a[iy][ix][1] * db1_dw0 +
+        df_dbarycentric_coords_a[iy][ix][2] * db2_dw0) / abs_det;
+
+      df_dvertices_a[v1_id][0] += (
+        df_dbarycentric_coords_a[iy][ix][0] * db0_dx1 +
+        df_dbarycentric_coords_a[iy][ix][1] * db1_dx1 +
+        df_dbarycentric_coords_a[iy][ix][2] * db2_dx1) / abs_det;
+      df_dvertices_a[v1_id][1] += (
+        df_dbarycentric_coords_a[iy][ix][0] * db0_dy1 +
+        df_dbarycentric_coords_a[iy][ix][1] * db1_dy1 +
+        df_dbarycentric_coords_a[iy][ix][2] * db2_dy1) / abs_det;
+      df_dvertices_a[v1_id][3] += (
+        df_dbarycentric_coords_a[iy][ix][0] * db0_dw1 +
+        df_dbarycentric_coords_a[iy][ix][1] * db1_dw1 +
+        df_dbarycentric_coords_a[iy][ix][2] * db2_dw1) / abs_det;
+
+      df_dvertices_a[v2_id][0] += (
+        df_dbarycentric_coords_a[iy][ix][0] * db0_dx2 +
+        df_dbarycentric_coords_a[iy][ix][1] * db1_dx2 +
+        df_dbarycentric_coords_a[iy][ix][2] * db2_dx2) / abs_det;
+      df_dvertices_a[v2_id][1] += (
+        df_dbarycentric_coords_a[iy][ix][0] * db0_dy2 +
+        df_dbarycentric_coords_a[iy][ix][1] * db1_dy2 +
+        df_dbarycentric_coords_a[iy][ix][2] * db2_dy2) / abs_det;
+      df_dvertices_a[v2_id][3] += (
+        df_dbarycentric_coords_a[iy][ix][0] * db0_dw2 +
+        df_dbarycentric_coords_a[iy][ix][1] * db1_dw2 +
+        df_dbarycentric_coords_a[iy][ix][2] * db2_dw2) / abs_det;
+    }
+  }
+  return { df_dvertices };
 }
 
 // Compute the triangle id, barycentric coordinates, and z-buffer at each pixel
 // in the image.
 //
 // Params:
-// vertices: A flattened 2D array with 4*vertex_count elements.
-//   Each contiguous triplet is the XYZW location of the vertex with that
+// vertices: A 2D float32 tensor with shape {vertex_count, 4}.
+//   Each quadtruplet is the XYZW location of the vertex with that
 //   triplet's id. The coordinates are assumed to be OpenGL-style clip-space
 //   (i.e., post-projection, pre-divide), where X points right, Y points up,
-//   Z points away.
-// triangles: A flattened 2D array with 3*triangle_count elements.
-//   Each contiguous triplet is the three vertex ids indexing into vertices
+//   Z points away. Note Z here is the clip-space (z-buffer) depth and W is the
+//   world space depth.
+// triangles: A 2D int32 tensor with shape {triangle_count, 3}.
+//   Each triplet is the three vertex ids indexing into vertices
 //   describing one triangle with clockwise winding.
-// triangle_count: The number of triangles stored in the array triangles.
 //
 // Returns:
 // px_triangle_ids: A 2D tensor with shape {image_height, image_width}.
@@ -135,10 +307,10 @@ std::vector<torch::Tensor> rasterize_triangles_backward() {
 std::vector<torch::Tensor> rasterize_triangles_forward(
   const torch::Tensor &vertices,
   const torch::Tensor &triangles,
-  int triangle_count,
   int image_width,
   int image_height
 ) {
+  const int triangle_count = (int) triangles.size(0);
   const float half_image_width = 0.5 * image_width;
   const float half_image_height = 0.5 * image_height;
   float unnormalized_matrix_inverse[9];
@@ -148,7 +320,7 @@ std::vector<torch::Tensor> rasterize_triangles_forward(
     torch::TensorOptions().dtype(torch::kInt32));
   auto px_barycentric_coords = torch::zeros(
     {image_height, image_width, 3},
-    torch::TensorOptions().dtype(torch::kFloat32).requires_grad(true));
+    torch::TensorOptions().dtype(torch::kFloat32));
   auto z_buffer = torch::ones(
     {image_height, image_width},
     torch::TensorOptions().dtype(torch::kFloat32));
@@ -161,9 +333,9 @@ std::vector<torch::Tensor> rasterize_triangles_forward(
     px_barycentric_coordinates.accessor<float, 3>();
 
   for (int triangle_id = 0; triangle_id < triangle_count; ++triangle_id) {
-    const int v0_id = 4 * triangles_a[triangle_id][0];
-    const int v1_id = 4 * triangles_a[triangle_id][1];
-    const int v2_id = 4 * triangles_a[triangle_id][2];
+    const int v0_id = triangles_a[triangle_id][0];
+    const int v1_id = triangles_a[triangle_id][1];
+    const int v2_id = triangles_a[triangle_id][2];
 
     const float v0w = vertices_a[v0_id][3];
     const float v1w = vertices_a[v1_id][3];
