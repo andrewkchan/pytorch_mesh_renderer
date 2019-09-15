@@ -169,4 +169,4 @@ def transform_homogeneous(matrices, vertices):
         [vertices.shape[0], vertices.shape[1], 1], dtype=torch.float32)
     vertices_homogeneous = torch.cat([vertices, homogeneous_coord], 2)
 
-    return torch.matmul(vertices_homogeneous, matrices.transpose())
+    return torch.matmul(vertices_homogeneous, matrices.transpose(1, 2))

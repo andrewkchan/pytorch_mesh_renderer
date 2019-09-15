@@ -158,9 +158,10 @@ def rasterize_clip_space(clip_space_vertices, attributes, triangles,
         px_triangle_ids, px_barycentric_coords, _ = BarycentricRasterizer.apply(
             clip_space_vertices[b, :, :], triangles, image_width, image_height)
         per_image_barycentric_coordinates.append(
-            torch.reshape(px_barycentric_coords, [-1, 3]))
+            torch.reshape(px_barycentric_coords, [-1, 3])) # [pixel_count, 3]
 
-        vertex_ids = torch.index_select(triangles, 0, px_triangle_ids)
+        vertex_ids = torch.index_select(
+            triangles, 0, torch.reshape(px_triangle_ids, [-1]).long()) # [pixel_count, 3]
         reindexed_ids = vertex_ids + b * clip_space_vertices.shape[1]
         per_image_vertex_ids.append(reindexed_ids)
 
@@ -173,7 +174,7 @@ def rasterize_clip_space(clip_space_vertices, attributes, triangles,
     # 'corner points') ids to get the relevant properties for deferred shading.
     flattened_vertex_attributes = torch.reshape(attributes,
                                                 [batch_size * vertex_count, -1])
-    corner_attributes = flattened_vertex_attributes[vertex_ids]
+    corner_attributes = flattened_vertex_attributes[vertex_ids.long()]
 
     # Computes the pixel attributes by interpolating the known attributes at
     # the corner points of the triangle interpolated with the

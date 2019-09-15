@@ -97,7 +97,7 @@ class RenderTest(unittest.TestCase):
         projection_1 = torch.matmul(self.perspective, look_at_1)
         projection_2 = torch.matmul(self.perspective, look_at_2)
         projection = torch.cat([projection_1, projection_2], dim=0)
-        background_value = [0., 0., 0., 0.]
+        background_value = torch.Tensor([0., 0., 0., 0.])
 
         rendered = rasterize(
             torch.stack([self.cube_vertex_positions,
