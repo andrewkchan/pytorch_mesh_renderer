@@ -24,7 +24,7 @@ inline int clamped_integer_max(float a, float b, float c, int low, int high) {
 
 // Takes the minimum of a, b, and c, rounds down, and converts to an integer
 // in the range [low, high].
-inline int clamped_integer_min(float, a, float, b, float c, int low, int high) {
+inline int clamped_integer_min(float a, float b, float c, int low, int high) {
   return std::min(
       std::max(static_cast<int>(std::floor(std::min(std::min(a, b), c))), low),
       high);
@@ -139,8 +139,6 @@ std::vector<torch::Tensor> rasterize_triangles_backward(
   const int vertex_count = (int) vertices.size(0);
   const int image_height = px_triangle_ids.size(0);
   const int image_width = px_triangle_ids.size(1);
-  const float half_image_height = 0.5 * image_height;
-  const float half_image_width = 0.5 * image_width;
   float unnormalized_matrix_inverse[9];
 
   auto df_dvertices = torch::zeros(
@@ -151,9 +149,9 @@ std::vector<torch::Tensor> rasterize_triangles_backward(
   auto vertices_a = vertices.accessor<float, 2>();
   auto triangles_a = triangles.accessor<int, 2>();
   auto px_triangle_ids_a = px_triangle_ids.accessor<int, 2>();
-  auto px_barycentric_coordinates_a =
-    px_barycentric_coordinates.accessor<float, 3>();
-  auto df_dvertices_a = df_dvertices.accessor<float, 5>();
+  auto px_barycentric_coords_a =
+    px_barycentric_coords.accessor<float, 3>();
+  auto df_dvertices_a = df_dvertices.accessor<float, 2>();
 
   for (int iy = 0; iy < image_height; ++iy) {
     for (int ix = 0; ix < image_width; ++ix) {
@@ -178,9 +176,6 @@ std::vector<torch::Tensor> rasterize_triangles_backward(
       const float v2x = vertices_a[v2_id][0];
       const float v2y = vertices_a[v2_id][1];
       const float v2w = vertices_a[v2_id][3];
-
-      const float px = ((ix + 0.5) / half_image_width) - 1.0;
-      const float py = ((iy + 0.5) / half_image_height) - 1.0;
 
       const float abs_det = std::abs(
         compute_unnormalized_matrix_inverse(
@@ -329,8 +324,8 @@ std::vector<torch::Tensor> rasterize_triangles_forward(
   auto triangles_a = triangles.accessor<int, 2>();
   auto z_buffer_a = z_buffer.accessor<float, 2>();
   auto px_triangle_ids_a = px_triangle_ids.accessor<int, 2>();
-  auto px_barycentric_coordinates_a =
-    px_barycentric_coordinates.accessor<float, 3>();
+  auto px_barycentric_coords_a =
+    px_barycentric_coords.accessor<float, 3>();
 
   for (int triangle_id = 0; triangle_id < triangle_count; ++triangle_id) {
     const int v0_id = triangles_a[triangle_id][0];
@@ -409,16 +404,16 @@ std::vector<torch::Tensor> rasterize_triangles_forward(
 
         px_triangle_ids_a[iy][ix] = triangle_id;
         z_buffer_a[iy][ix] = z;
-        px_barycentric_coordinates_a[iy][ix][0] = b0;
-        px_barycentric_coordinates_a[iy][ix][1] = b1;
-        px_barycentric_coordinates_a[iy][ix][2] = b2;
+        px_barycentric_coords_a[iy][ix][0] = b0;
+        px_barycentric_coords_a[iy][ix][1] = b1;
+        px_barycentric_coords_a[iy][ix][2] = b2;
       }
     }
   }
 
   return {
     px_triangle_ids,
-    px_barycentric_coordinates,
+    px_barycentric_coords,
     z_buffer
   };
 }

@@ -11,7 +11,7 @@ import camera_utils
 import rasterize_triangles_cpp
 
 
-class BarycentricRasterizer(torch.autograd.function):
+class BarycentricRasterizer(torch.autograd.Function):
     @staticmethod
     def forward(ctx, clip_space_vertices, triangles, image_width, image_height):
         """Rasterize the input mesh expressed in clip-space (xyzw) coordinates.
@@ -66,7 +66,7 @@ class BarycentricRasterizer(torch.autograd.function):
             clip_space_vertices,
             triangles,
             px_triangle_ids,
-            px_barycentric_coordinates)
+            px_barycentric_coords)
         df_dvertices, = output
         return df_dvertices, torch.zeros_like(triangles), 0, 0
 

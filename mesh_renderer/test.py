@@ -19,17 +19,17 @@ class RenderTest(unittest.TestCase):
         self.test_data_directory = (
             "mesh_renderer/test_data")
 
-    # Set up a cube centered at the origin with vertex normals pointing
-    # outwards along the line from the origin to the cube vertices:
-    self.cube_vertices = torch.tensor(
-        [[-1, -1, 1], [-1, -1, -1], [-1, 1, -1], [-1, 1, 1], [1, -1, 1],
-         [1, -1, -1], [1, 1, -1], [1, 1, 1]],
-         dtype=torch.float32, requires_grad=True)
-    self.cube_normals = torch.div(self.cube_vertices, np.sqrt(1 + 1 + 1))
-    self.cube_triangles = torch.tensor(
-        [[0, 1, 2], [2, 3, 0], [3, 2, 6], [6, 7, 3], [7, 6, 5], [5, 4, 7],
-         [4, 5, 1], [1, 0, 4], [5, 6, 2], [2, 1, 5], [7, 4, 0], [0, 3, 7]],
-        dtype=torch.int32)
+        # Set up a cube centered at the origin with vertex normals pointing
+        # outwards along the line from the origin to the cube vertices:
+        self.cube_vertices = torch.tensor(
+            [[-1, -1, 1], [-1, -1, -1], [-1, 1, -1], [-1, 1, 1], [1, -1, 1],
+            [1, -1, -1], [1, 1, -1], [1, 1, 1]],
+            dtype=torch.float32, requires_grad=True)
+        self.cube_normals = torch.div(self.cube_vertices, np.sqrt(1 + 1 + 1))
+        self.cube_triangles = torch.tensor(
+            [[0, 1, 2], [2, 3, 0], [3, 2, 6], [6, 7, 3], [7, 6, 5], [5, 4, 7],
+            [4, 5, 1], [1, 0, 4], [5, 6, 2], [2, 1, 5], [7, 4, 0], [0, 3, 7]],
+            dtype=torch.int32)
 
     def testRendersSimpleCube(self):
         """Render a simple cube to test the full forward pass.
@@ -57,17 +57,17 @@ class RenderTest(unittest.TestCase):
         light_intensities = torch.ones([2, 1, 3], dtype=torch.float32)
         vertex_diffuse_colors = torch.ones_like(vertices_world_space, dtype=torch.float32)
 
-        rendered_images = mesh_renderer.mesh_renderer(
+        renders = mesh_renderer.mesh_renderer(
             vertices_world_space, self.cube_triangles, normals_world_space,
             vertex_diffuse_colors, eye, center, world_up, light_positions,
             light_intensities, image_width, image_height)
 
-        for image_id in range(rendered_images.shape[0]):
+        for image_id in range(renders.shape[0]):
             target_image_name = "Gray_Cube_%i.png" % image_id
             baseline_image_path = os.path.join(self.test_data_directory,
                                                target_image_name)
             test_utils.expect_image_file_and_render_are_near(
-                self, baseline_image_path, rendered_images[image_id, :, :, :])
+                self, baseline_image_path, renders[image_id, :, :, :])
 
     def testComplexShading(self):
         """Test specular highlights, colors, and multiple lights per image."""
@@ -118,7 +118,7 @@ class RenderTest(unittest.TestCase):
                                               dtype=torch.float32)
         shininess_coefficients = 6.0 * torch.ones([2, 8], dtype=torch.float32)
         ambient_color = torch.tensor([[0.0, 0.0, 0.0], [0.1, 0.1, 0.2]], dtype=torch.float32)
-        rendered_images = mesh_renderer.mesh_renderer(
+        renders = mesh_renderer.mesh_renderer(
             vertices_world_space,
             self.cube_triangles,
             normals_world_space,
@@ -140,7 +140,7 @@ class RenderTest(unittest.TestCase):
                 mesh_renderer.tone_mapper(renders[:, :, :, 0:3], 0.7),
                 renders[:, :, :, 3:4]
             ],
-            axis=3)
+            dim=3)
 
         # Check that shininess coefficient broadcasting works by also rendering
         # with a scalar shininess coefficient, and ensuring the result is identical:
@@ -162,20 +162,20 @@ class RenderTest(unittest.TestCase):
             fov_y,
             near_clip,
             far_clip)
-        broadcasted_rendered_images = tf.cat([
+        tonemapped_broadcasted_renders = torch.cat([
                 mesh_renderer.tone_mapper(broadcasted_renders[:, :, :, 0:3], 0.7),
                 broadcasted_renders[:, :, :, 3:4]
             ],
-            axis=3)
+            dim=3)
 
-        for image_id in range(rendered_images.shape[0]):
+        for image_id in range(renders.shape[0]):
             target_image_name = "Colored_Cube_%i.png" % image_id
             baseline_image_path = os.path.join(self.test_data_directory,
                                                target_image_name)
             test_utils.expect_image_file_and_render_are_near(
-                self, baseline_image_path, rendered_images[image_id, :, :, :])
+                self, baseline_image_path, tonemapped_renders[image_id, :, :, :])
             test_utils.expect_image_file_and_render_are_near(
-                self, baseline_image_path, broadcasted_rendered_images[image_id, :, :, :])
+                self, baseline_image_path, tonemapped_broadcasted_renders[image_id, :, :, :])
 
     def testFullRenderGradientComputation(self):
         """Verify the Jacobian matrix for the entire renderer.
@@ -201,7 +201,7 @@ class RenderTest(unittest.TestCase):
         world_up = torch.tensor([0.0, 1.0, 0.0], dtype=torch.float32)
 
         # Scene has a single light from the viewer's eye.
-        light_positions = torch.unsqueeze(torch.stack([eye, eye], axis=0), 1)
+        light_positions = torch.unsqueeze(torch.stack([eye, eye], dim=0), 1)
         light_intensities = torch.ones([2, 1, 3], dtype=torch.float32)
 
         def render_complex_cube(cube_vertices):
@@ -317,7 +317,7 @@ class RenderTest(unittest.TestCase):
         test_utils.expect_image_file_and_render_are_near(
             self,
             baseline_image_path,
-            final_image,
+            render,
             max_outlier_fraction=0.01,
             pixel_error_threshold=0.04)
 

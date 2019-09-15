@@ -9,14 +9,14 @@ import numpy as np
 import torch
 
 import camera_utils
-from rasterize_triangles import RasterizeFunction
+from rasterize_triangles import rasterize
 import rasterize_triangles_cpp
 import test_utils
 
 
 class RenderTest(unittest.TestCase):
     def setUp(self):
-        self.test_data_directory = "mesh_renderer/test_data/"
+        self.test_data_directory = "test_data/"
 
         self.cube_vertex_positions = torch.tensor(
             [[-1, -1, 1], [-1, -1, -1], [-1, 1, -1], [-1, 1, 1], [1, -1, 1],
@@ -56,15 +56,15 @@ class RenderTest(unittest.TestCase):
         clip_coordinates = torch.tensor(clip_init)
         triangles = torch.tensor([[0, 1, 2]], dtype=torch.int32)
 
-        image, _, _ = (
+        _, barycentric_coords, _ = (
             rasterize_triangles_cpp.forward(
                 clip_coordinates,
                 triangles,
                 self.image_width,
                 self.image_height))
         image = torch.cat(
-            [rendered_coordinates,
-             torch.ones([self.image_height, self.image_width, 1])], axis=2)
+            [barycentric_coords,
+             torch.ones([self.image_height, self.image_width, 1])], dim=2)
         baseline_image_path = os.path.join(self.test_data_directory,
                                            target_image_name)
         test_utils.expect_image_file_and_render_are_near(
@@ -82,7 +82,7 @@ class RenderTest(unittest.TestCase):
         """
 
         vertex_rgb = (self.cube_vertex_positions * 0.5 + 0.5)
-        vertex_rgba = torch.cat([vertex_rgb, torch.ones([8, 1])], axis=1)
+        vertex_rgba = torch.cat([vertex_rgb, torch.ones([8, 1])], dim=1)
 
         center = torch.tensor([[0, 0, 0]], dtype=torch.float32)
         world_up = torch.tensor([[0, 1, 0]], dtype=torch.float32)
@@ -96,10 +96,10 @@ class RenderTest(unittest.TestCase):
             world_up)
         projection_1 = torch.matmul(self.perspective, look_at_1)
         projection_2 = torch.matmul(self.perspective, look_at_2)
-        projection = torch.cat([projection_1, projection_2], axis=0)
+        projection = torch.cat([projection_1, projection_2], dim=0)
         background_value = [0., 0., 0., 0.]
 
-        rendered = RasterizeFunction.apply(
+        rendered = rasterize(
             torch.stack([self.cube_vertex_positions,
                          self.cube_vertex_positions]),
             torch.stack([vertex_rgba, vertex_rgba]),

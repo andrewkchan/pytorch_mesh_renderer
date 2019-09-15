@@ -36,7 +36,10 @@ def euler_matrices(angles):
         ],
         dim=0)
     reshaped = torch.reshape(flattened, [4, 4, -1])
-    return torch.transpose(reshaped, [2, 0, 1])
+    # transpose dims [0, 1, 2] -> [2, 0, 1]
+    reshaped = torch.transpose(reshaped, 0, 1)
+    reshaped = torch.transpose(reshaped, 0, 2)
+    return reshaped
 
 
 def look_at(eye, center, world_up):
@@ -64,14 +67,14 @@ def look_at(eye, center, world_up):
     forward_norm = torch.tensor(
         np.linalg.norm(forward, ord=None, axis=1, keepdims=True))
     np.testing.assert_array_less(vector_degeneracy_cutoff, forward_norm,
-        message="Camera matrix is degenerate because eye and center are close.")
+        err_msg="Camera matrix is degenerate because eye and center are close.")
     forward = forward/forward_norm
 
     to_side = torch.cross(forward, world_up)
     to_side_norm = torch.tensor(
         np.linalg.norm(to_side, ord=None, axis=1, keepdims=True))
     np.testing.assert_array_less(vector_degeneracy_cutoff, to_side_norm,
-        message="Camera matrix is degenerate because up and gaze are too close "
+        err_msg="Camera matrix is degenerate because up and gaze are too close "
                 "or because up is degenerate.")
     to_side = to_side/to_side_norm
     cam_up = torch.cross(to_side, forward)
@@ -82,9 +85,9 @@ def look_at(eye, center, world_up):
     view_rotation = torch.stack(
         [to_side, cam_up, -forward,
          torch.zeros_like(to_side, dtype=torch.float32)],
-        axis=1) # [batch_size, 4, 3] matrix
+        dim=1) # [batch_size, 4, 3] matrix
     view_rotation = torch.cat([view_rotation, w_column],
-                              axis=2) # [batch_size, 4, 4]
+                              dim=2) # [batch_size, 4, 4]
 
     identity_batch = torch.unsqueeze(torch.eye(3), 0).repeat([batch_size, 1, 1])
     view_translation = torch.cat([identity_batch, torch.unsqueeze(-eye, 2)], 2)
@@ -130,9 +133,12 @@ def perspective(aspect_ratio, fov_y, near_clip, far_clip):
             zeros, focal_lengths_y, zeros, zeros,
             zeros, zeros, p_22, p_23,
             zeros, zeros, -torch.ones_like(p_23, dtype=torch.float32), zeros
-        ], axis=0)
+        ], dim=0)
     perspective_transform = torch.reshape(perspective_transform, [4, 4, -1])
-    return torch.transpose(perspective_transform, [2, 0, 1])
+    # transpose dimensions [0, 1, 2] -> [2, 0, 1]
+    perspective_transform = torch.transpose(perspective_transform, 0, 1)
+    perspective_transform = torch.transpose(perspective_transform, 0, 2)
+    return perspective_transform
 
 
 def transform_homogeneous(matrices, vertices):

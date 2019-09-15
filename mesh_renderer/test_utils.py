@@ -25,12 +25,12 @@ def expect_image_file_and_render_are_near(test_instance,
     Args:
       test_instance: a python unittest.TestCase instance.
       baseline_path: path to the reference image on disk.
-      result_image: the result image, as a numpy array.
+      result_image: the result image, as a Tensor.
       max_outlier_fraction: the maximum fraction of outlier pixels allowed.
       pixel_error_threshold: pixel values are considered different if their
         difference exceeds this amount. Range is 0.0 - 1.0.
     """
-    baseline_image = torch.from_numpy(io.imread(baseline_path))
+    baseline_image = io.imread(baseline_path)
 
     test_instance.assertEqual(baseline_image.shape, result_image.shape,
                               "Images shapes {}and {} do not match."

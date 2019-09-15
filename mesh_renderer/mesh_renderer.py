@@ -188,7 +188,7 @@ def mesh_renderer(
     clip_space_transforms = torch.matmul(perspective_transforms, camera_matrices)
 
     pixel_attributes = rasterize(
-        vertices, vertex_attributes, triangles, triangles,
+        vertices, vertex_attributes, triangles,
         clip_space_transforms, image_width, image_height,
         [-1] * vertex_attributes.shape[2])
 
