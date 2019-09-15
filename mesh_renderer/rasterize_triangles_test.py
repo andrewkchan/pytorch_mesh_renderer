@@ -9,8 +9,7 @@ import numpy as np
 import torch
 
 import camera_utils
-from rasterize_triangles import rasterize
-import rasterize_triangles_cpp
+from rasterize_triangles import rasterize, BarycentricRasterizer
 import test_utils
 
 
@@ -57,7 +56,7 @@ class RenderTest(unittest.TestCase):
         triangles = torch.tensor([[0, 1, 2]], dtype=torch.int32)
 
         _, barycentric_coords, _ = (
-            rasterize_triangles_cpp.forward(
+            BarycentricRasterizer.apply(
                 clip_coordinates,
                 triangles,
                 self.image_width,
@@ -130,22 +129,22 @@ class RenderTest(unittest.TestCase):
         triangles = torch.tensor([[0, 1, 2]], dtype=torch.int32)
 
         def rasterize_test_pixels(clip_coordinates):
-            barycentric_coordinates, _, _ = (
-                rasterize_triangles_cpp.forward(
+            _, barycentric_coords, _ = (
+                BarycentricRasterizer.apply(
                     clip_coordinates,
                     triangles,
                     self.image_width,
                     self.image_height))
 
-            pixels_to_compare = barycentric_coordinates[
-                test_pixel_y: test_pixel_y + 1, test_pixel_x:test_pixel_x + 1, :]
+            pixels_to_compare = barycentric_coords[
+                test_pixel_y: test_pixel_y + 1, test_pixel_x: test_pixel_x + 1, :]
             return pixels_to_compare
 
-        test_clip_coordinates = np.array(
+        test_clip_coordinates = torch.tensor(
             [[-0.5, -0.5, 0.8, 1.0],
              [0.0, 0.5, 0.3, 1.0],
              [0.5, -0.5, 0.3, 1.0]],
-            dtype=np.float32,
+            dtype=torch.float32,
             requires_grad=True)
         jacobians_match = torch.autograd.gradcheck(
             rasterize_test_pixels,
@@ -164,17 +163,17 @@ class RenderTest(unittest.TestCase):
         image_width = 28
 
         def get_barycentric_coordinates(clip_coordinates):
-            barycentric_coordinates, _, _ = (
-                rasterize_triangles_cpp.forward(
+            _, barycentric_coords, _ = (
+                BarycentricRasterizer.apply(
                     clip_coordinates,
                     self.cube_triangles,
                     image_width,
                     image_height))
-            return barycentric_coordinates
+            return barycentric_coords
 
         # Precomputed transformation of the simple cube to normalized device
         # coordinates, in order to isolate the rasterization gradient.
-        test_clip_coordinates = np.array(
+        test_clip_coordinates = torch.tensor(
             [[-0.43889722, -0.53184521, 0.85293502, 1.0],
              [-0.37635487, 0.22206162, 0.90555805, 1.0],
              [-0.22849123, 0.76811147, 0.80993629, 1.0],
@@ -183,7 +182,7 @@ class RenderTest(unittest.TestCase):
              [0.16183566, 0.08129397, 0.93020856, 1.0],
              [0.44147962, 0.53497446, 0.85076219, 1.0],
              [0.53008741, -0.31276882, 0.77620775, 1.0]],
-            dtype=np.float32,
+            dtype=torch.float32,
             requires_grad=True)
         jacobians_match = torch.autograd.gradcheck(
             get_barycentric_coordinates,

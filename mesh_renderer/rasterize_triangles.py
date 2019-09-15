@@ -51,7 +51,7 @@ class BarycentricRasterizer(torch.autograd.Function):
         return px_triangle_ids, px_barycentric_coords, z_buffer
 
     @staticmethod
-    def backward(ctx, df_dbarycentric_coords):
+    def backward(ctx, _, df_dbarycentric_coords, __):
         """Get the gradient of a scalar loss function w.r.t. input vertices
         expressed in clip-space (xyzw) coordinates.
         In the backward pass we receive a Tensor containing the gradient of the
@@ -68,7 +68,7 @@ class BarycentricRasterizer(torch.autograd.Function):
             px_triangle_ids,
             px_barycentric_coords)
         df_dvertices, = output
-        return df_dvertices, torch.zeros_like(triangles), 0, 0
+        return df_dvertices, torch.zeros_like(triangles), None, None
 
 
 def rasterize(world_space_vertices, attributes, triangles,

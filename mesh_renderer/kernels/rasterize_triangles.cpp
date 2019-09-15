@@ -143,7 +143,7 @@ std::vector<torch::Tensor> rasterize_triangles_backward(
 
   auto df_dvertices = torch::zeros(
     {vertex_count, 4},
-    torch::TensorOptions().dtype(torch::kFloat32));
+    torch::dtype(torch::kFloat32));
 
   auto df_dbarycentric_coords_a = df_dbarycentric_coords.accessor<float, 3>();
   auto vertices_a = vertices.accessor<float, 2>();
@@ -312,13 +312,13 @@ std::vector<torch::Tensor> rasterize_triangles_forward(
   float b_over_w[3];
   auto px_triangle_ids = torch::zeros(
     {image_height, image_width},
-    torch::TensorOptions().dtype(torch::kInt32));
+    torch::dtype(torch::kInt32));
   auto px_barycentric_coords = torch::zeros(
     {image_height, image_width, 3},
-    torch::TensorOptions().dtype(torch::kFloat32));
+    torch::dtype(torch::kFloat32).requires_grad(true));
   auto z_buffer = torch::ones(
     {image_height, image_width},
-    torch::TensorOptions().dtype(torch::kFloat32));
+    torch::dtype(torch::kFloat32));
 
   auto vertices_a = vertices.accessor<float, 2>();
   auto triangles_a = triangles.accessor<int, 2>();
