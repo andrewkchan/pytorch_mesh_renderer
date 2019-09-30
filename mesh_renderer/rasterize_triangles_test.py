@@ -184,12 +184,15 @@ class RenderTest(unittest.TestCase):
              [0.53008741, -0.31276882, 0.77620775, 1.0]],
             dtype=torch.float32,
             requires_grad=True)
-        jacobians_match = torch.autograd.gradcheck(
-            get_barycentric_coordinates,
-            test_clip_coordinates,
-            eps=4e-2,
-            atol=0.1,
-            rtol=0.01)
+        raster_out = get_barycentric_coordinates(test_clip_coordinates)
+        analytical = test_utils.get_analytical_jacobian(
+            test_clip_coordinates, raster_out)
+        numerical = test_utils.get_numerical_jacobian(
+            get_barycentric_coordinates, test_clip_coordinates, eps=4e-2)
+
+        jacobians_match = (
+            test_utils.check_jacobians_are_nearly_equal(
+                analytical, numerical, 0.01, 0.01))
         self.assertTrue(
             jacobians_match,
             "Analytical and numerical jacobians have too many relative or "
