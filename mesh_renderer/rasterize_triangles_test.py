@@ -9,7 +9,7 @@ import numpy as np
 import torch
 
 import camera_utils
-from rasterize_triangles import rasterize, BarycentricRasterizer
+from rasterize_triangles import rasterize, rasterize_barycentric
 import test_utils
 
 
@@ -56,7 +56,7 @@ class RenderTest(unittest.TestCase):
         triangles = torch.tensor([[0, 1, 2]], dtype=torch.int32)
 
         _, barycentric_coords, _ = (
-            BarycentricRasterizer.apply(
+            rasterize_barycentric(
                 clip_coordinates,
                 triangles,
                 self.image_width,
@@ -130,7 +130,7 @@ class RenderTest(unittest.TestCase):
 
         def rasterize_test_pixels(clip_coordinates):
             _, barycentric_coords, _ = (
-                BarycentricRasterizer.apply(
+                rasterize_barycentric(
                     clip_coordinates,
                     triangles,
                     self.image_width,
@@ -164,7 +164,7 @@ class RenderTest(unittest.TestCase):
 
         def get_barycentric_coordinates(clip_coordinates):
             _, barycentric_coords, _ = (
-                BarycentricRasterizer.apply(
+                rasterize_barycentric(
                     clip_coordinates,
                     self.cube_triangles,
                     image_width,

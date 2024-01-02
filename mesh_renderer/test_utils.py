@@ -134,8 +134,8 @@ def expect_image_file_and_render_are_near(test_instance,
     result_image = np.clip(result_image, 0., 1.).copy(order="C")
     baseline_image = baseline_image.astype(float) / 255.0
 
-    outlier_channels = (
-        np.abs(baseline_image - result_image) > pixel_error_threshold)
+    diff_image = np.abs(baseline_image - result_image)
+    outlier_channels = diff_image > pixel_error_threshold
     outlier_pixels = np.any(outlier_channels, axis=2)
     outlier_count = np.count_nonzero(outlier_pixels)
     outlier_fraction = outlier_count / np.prod(baseline_image.shape[:2])
@@ -144,14 +144,17 @@ def expect_image_file_and_render_are_near(test_instance,
     outputs_dir = "/tmp"  # os.environ["TEST_TMPDIR"]
     base_prefix = os.path.splitext(os.path.basename(baseline_path))[0]
     result_output_path = os.path.join(outputs_dir, base_prefix + "_result.png")
+    diff_output_path = os.path.join(outputs_dir, base_prefix + "_diff.png")
 
     message = ("{} does not match. ({} of pixels are outliers, {} is allowed.)."
-               " Result image written to {}"
+               " Result image written to {}, Diff written to {}"
                .format(
                    baseline_path, outlier_fraction,
-                   max_outlier_fraction, result_output_path))
+                   max_outlier_fraction, result_output_path, diff_output_path))
 
     if not images_match:
-        io.imsave(result_output_path, result_image * 255.0)
+        io.imsave(result_output_path, (result_image * 255.0).astype(np.uint8))
+        diff_image[:,:,3] = 1.0
+        io.imsave(diff_output_path, (diff_image * 255.0).astype(np.uint8))
 
     test_instance.assertTrue(images_match, msg=message)
