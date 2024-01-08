@@ -190,7 +190,7 @@ def mesh_renderer(
     pixel_attributes = rasterize(
         vertices, vertex_attributes, triangles,
         clip_space_transforms, image_width, image_height,
-        [-1] * vertex_attributes.shape[2])
+        torch.tensor([-1] * vertex_attributes.shape[2]))
 
     # Extract the interpolated vertex attributes from the pixel buffer and
     # supply them to the shader:
@@ -208,7 +208,7 @@ def mesh_renderer(
             shininess_coefficients = torch.reshape(
                 shininess_coefficients, [-1, 1, 1])
 
-    pixel_mask = (diffuse_colors >= 0.0).reduce(dim=3).type(torch.float32)
+    pixel_mask = (diffuse_colors >= 0.0).any(dim=3).type(torch.float32)
 
     renders = phong_shader(
         normals=pixel_normals,
@@ -280,7 +280,7 @@ def phong_shader(normals,
     Raises:
         ValueError: An invalid argument to the method is detected.
     """
-    batch_size, image_height, image_width = [s.value for s in normals.shape[:-1]]
+    batch_size, image_height, image_width = [s for s in normals.shape[:-1]]
     light_count = light_positions.shape[1]
     pixel_count = image_height * image_width
     # Reshape all values to easily do pixelwise computations:
@@ -326,13 +326,13 @@ def phong_shader(normals,
                 normals, 1) - directions_to_lights,
             p=2,
             dim=3) # [batch_size, light_count, pixel_count, 3]
-        direction_to_camera = torch.nn.normalize(
+        direction_to_camera = torch.nn.functional.normalize(
             camera_position - pixel_positions,
             p=2,
             dim=2) # [batch_size, pixel_count, 3]
         reflection_direction_dot_camera_direction = torch.sum(
             mirror_reflection_direction * torch.unsqueeze(direction_to_camera, 1),
-            dim=3),
+            dim=3)
         # The specular component should only contribute when the reflection is
         # external:
         reflection_direction_dot_camera_direction = torch.clamp(
@@ -377,7 +377,7 @@ def phong_shader(normals,
         valid_rgb_values,
         rgb_images,
         torch.zeros_like(rgb_images, dtype=torch.float32))
-    return torch.reverse(
+    return torch.flip(
         torch.cat([rgb_images, alpha_images], dim=3),
         dims=[1])
 
