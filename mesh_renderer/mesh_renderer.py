@@ -44,7 +44,7 @@ def mesh_renderer(
       diffuse_colors: 3D float32 tensor with shape [batch_size,
         vertex_count, 3]. The RGB diffuse reflection in the range [0, 1] for
         each vertex.
-      camera_position: 2D tensor withb shape [batch_size, 3] or 1D tensor with
+      camera_position: 2D tensor with shape [batch_size, 3] or 1D tensor with
         shape [3] specifying the XYZ world space camera position.
       camera_lookat: 2D tensor with shape [batch_size, 3] or 1D tensor with
         shape [3] containing an XYZ point along the center of the camera's gaze.
@@ -67,7 +67,7 @@ def mesh_renderer(
         vertex. A 0D tensor or float gives a constant shininess coefficient of
         all vertices across all batches and images. A 1D tensor must have shape
         [batch_size], and a single shininess coefficient per image is used.
-      ambient_color: a 2D tensor with shape [bath_size, 3]. The RGB ambient
+      ambient_color: a 2D tensor with shape [batch_size, 3]. The RGB ambient
         color, which is added to each pixel in the scene. If None, it is
         assumed to be black.
       fov_y: float, 0D tensor, or 1D tensor with shape [batch_size] specifying
