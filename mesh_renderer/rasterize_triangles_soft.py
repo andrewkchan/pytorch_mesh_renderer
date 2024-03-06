@@ -1,4 +1,4 @@
-import camera_utils
+from mesh_renderer import camera_utils
 import torch
 import math
 

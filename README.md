@@ -47,12 +47,12 @@ Rendering a shaded mesh can be done with the `mesh_renderer` function in `mesh_r
 - `light_intensities`: a 3D tensor with shape `[batch_size, light_count, 3]`. The RGB intensity values for each light. Intensities may be above 1.
 - `image_width`: int specifying desired output image width in pixels.
 - `image_height`: int specifying desired output image height in pixels.
-- `specular_colors`: 3D float32 tensor with shape `[batch_size, vertex_count, 3]`. The RGB specular reflection in the range `[0, 1]` for each vertex. If supplied, specular reflections will be computed, and both specular colors and shininess_coefficients are expected.
-- `shininess_coefficients`: a 0D-2D float32 tensor with maximum shape `[batch_size, vertex_count]`. The phong shininess coefficient of each vertex. A 0D tensor or float gives a constant shininess coefficient of all vertices across all batches and images. A 1D tensor must have shape `[batch_size]`, and a single shininess coefficient per image is used.
-- `ambient_color`: a 2D tensor with shape `[batch_size, 3]`. The RGB ambient color, which is added to each pixel in the scene. If None, it is assumed to be black.
-- `fov_y`: float, 0D tensor, or 1D tensor with shape `[batch_size]` specifying desired output image y field of view in degrees.
-- `near_clip`: float, 0D tensor, or 1D tensor with shape `[batch_size]` specifying near clipping plane distance.
-- `far_clip`: float, 0D tensor, or 1D tensor with shape [batch_size] specifying far clipping plane distance.
+- `specular_colors`: (optional) 3D float32 tensor with shape `[batch_size, vertex_count, 3]`. The RGB specular reflection in the range `[0, 1]` for each vertex. If supplied, specular reflections will be computed, and both specular colors and shininess_coefficients are expected.
+- `shininess_coefficients`: (optional) a 0D-2D float32 tensor with maximum shape `[batch_size, vertex_count]`. The phong shininess coefficient of each vertex. A 0D tensor or float gives a constant shininess coefficient of all vertices across all batches and images. A 1D tensor must have shape `[batch_size]`, and a single shininess coefficient per image is used.
+- `ambient_color`: (optional) a 2D tensor with shape `[batch_size, 3]`. The RGB ambient color, which is added to each pixel in the scene. If None, it is assumed to be black.
+- `fov_y`: (optional) float, 0D tensor, or 1D tensor with shape `[batch_size]` specifying desired output image y field of view in degrees.
+- `near_clip`: (optional) float, 0D tensor, or 1D tensor with shape `[batch_size]` specifying near clipping plane distance.
+- `far_clip`: (optional) float, 0D tensor, or 1D tensor with shape [batch_size] specifying far clipping plane distance.
 
 
 #### Returns:

@@ -7,17 +7,17 @@ from __future__ import print_function
 import os
 import torch
 
-import camera_utils
+from mesh_renderer import camera_utils
 
 USE_CPP_RASTERIZER = False
 def rasterize_barycentric(clip_space_vertices, triangles, image_width, image_height):
     if USE_CPP_RASTERIZER:
-        import rasterize_triangles_hard
+        from mesh_renderer import rasterize_triangles_hard
         return rasterize_triangles_hard.BarycentricRasterizer.apply(
             clip_space_vertices, triangles, image_width, image_height
         )
     else:
-        import rasterize_triangles_soft
+        from mesh_renderer import rasterize_triangles_soft
         return rasterize_triangles_soft.rasterize_barycentric(
             clip_space_vertices, triangles, image_width, image_height
         )

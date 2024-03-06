@@ -6,8 +6,8 @@ from __future__ import print_function
 
 import torch
 
-import camera_utils
-from rasterize_triangles import rasterize
+from mesh_renderer import camera_utils
+from mesh_renderer.rasterize_triangles import rasterize
 
 
 def mesh_renderer(

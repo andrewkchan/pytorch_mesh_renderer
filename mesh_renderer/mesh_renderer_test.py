@@ -4,9 +4,9 @@ import unittest
 import numpy as np
 import torch
 
-import camera_utils
-import mesh_renderer
-import test_utils
+from mesh_renderer import camera_utils
+from mesh_renderer import mesh_renderer
+from mesh_renderer import test_utils
 
 class RenderTest(unittest.TestCase):
     def setUp(self):

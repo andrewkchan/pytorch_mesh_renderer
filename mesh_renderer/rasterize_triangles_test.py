@@ -8,9 +8,9 @@ import unittest
 import numpy as np
 import torch
 
-import camera_utils
-from rasterize_triangles import rasterize, rasterize_barycentric
-import test_utils
+from mesh_renderer import camera_utils
+from mesh_renderer.rasterize_triangles import rasterize, rasterize_barycentric
+from mesh_renderer import test_utils
 
 
 class RenderTest(unittest.TestCase):
