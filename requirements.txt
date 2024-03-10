@@ -1,6 +1,7 @@
 filelock==3.13.1
 fsspec==2023.12.2
 imageio==2.33.1
+imageio-ffmpeg==0.4.9
 Jinja2==3.1.2
 lazy_loader==0.3
 MarkupSafe==2.1.3

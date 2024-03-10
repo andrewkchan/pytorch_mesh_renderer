@@ -26,12 +26,13 @@ if __name__ == "__main__":
     # TODO why are triangles not batched?
     normals = normals[None,:,:] # [num_vertices, 3] -> [batch_size=1, num_vertices, 3]
 
-    num_vertices = vertices.shape[1]
-
     # camera position:
     eye = torch.tensor([[0.0, 0.0, 3.0]], dtype=torch.float32)
     center = torch.tensor([[0.0, 0.0, 0.0]], dtype=torch.float32)
     world_up = torch.tensor([[0.0, 1.0, 0.0]], dtype=torch.float32)
+
+    eye = torch.tensor([0.0, 3.0, 3.0], dtype=torch.float32)
+    world_up = torch.tensor([0.0, np.cos(-np.pi/4.), np.sin(-np.pi/4.)], dtype=torch.float32)
 
     # create a diffuse colors tensor coloring all vertices white
     vertex_diffuse_colors = torch.ones_like(vertices, dtype=torch.float32)
