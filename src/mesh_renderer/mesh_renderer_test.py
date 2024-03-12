@@ -4,9 +4,9 @@ import unittest
 import numpy as np
 import torch
 
-from mesh_renderer import camera_utils
-from mesh_renderer import mesh_renderer
-from mesh_renderer import test_utils
+from ..common import camera_utils
+from .. import mesh_renderer
+from . import test_utils
 
 class RenderTest(unittest.TestCase):
     def setUp(self):
@@ -56,7 +56,7 @@ class RenderTest(unittest.TestCase):
         light_intensities = torch.ones([2, 1, 3], dtype=torch.float32)
         vertex_diffuse_colors = torch.ones_like(vertices_world_space, dtype=torch.float32)
 
-        images = mesh_renderer.mesh_renderer(
+        images = mesh_renderer.render(
             vertices_world_space, self.cube_triangles, normals_world_space,
             vertex_diffuse_colors, eye, center, world_up, light_positions,
             light_intensities, image_width, image_height
@@ -122,7 +122,7 @@ class RenderTest(unittest.TestCase):
         shininess_coefficients = 6.0 * torch.ones([2, 8], dtype=torch.float32)
         ambient_color = torch.tensor(
             [[0., 0., 0.], [0.1, 0.1, 0.2]], dtype=torch.float32)
-        renders = mesh_renderer.mesh_renderer(
+        renders = mesh_renderer.render(
             vertices_world_space, self.cube_triangles, normals_world_space,
             vertex_diffuse_colors, eye, center, world_up, light_positions,
             light_intensities, image_width, image_height, vertex_specular_colors,
@@ -136,7 +136,7 @@ class RenderTest(unittest.TestCase):
 
         # Check that shininess coefficient broadcasting works by also rendering
         # with a scalar shininess coefficient, and ensuring the result is identical:
-        broadcasted_renders = mesh_renderer.mesh_renderer(
+        broadcasted_renders = mesh_renderer.render(
             vertices_world_space, self.cube_triangles, normals_world_space,
             vertex_diffuse_colors, eye, center, world_up, light_positions,
             light_intensities, image_width, image_height, vertex_specular_colors,
@@ -182,7 +182,7 @@ class RenderTest(unittest.TestCase):
 
             vertex_diffuse_colors = torch.ones_like(vertices_world_space, dtype=torch.float32)
 
-            rendered = mesh_renderer.mesh_renderer(
+            rendered = mesh_renderer.render(
                 vertices_world_space, self.cube_triangles, normals_world_space,
                 vertex_diffuse_colors, eye, center, world_up, light_positions,
                 light_intensities, image_width, image_height)
@@ -232,7 +232,7 @@ class RenderTest(unittest.TestCase):
             light_positions = torch.reshape(eye, [1, 1, 3])
             light_intensities = torch.ones([1, 1, 3], dtype=torch.float32)
 
-            render = mesh_renderer.mesh_renderer(
+            render = mesh_renderer.render(
                 vertices_world_space, self.cube_triangles, normals_world_space,
                 vertex_diffuse_colors, eye, center, world_up, light_positions,
                 light_intensities, image_width, image_height)

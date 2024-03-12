@@ -7,21 +7,19 @@ This repository contains a differentiable, 3D mesh renderer using PyTorch. It is
 1. Create a virtual environment with `python3 -m venv env`
 2. Activate it with `source env/bin/activate`
 3. Install external dependencies with `pip install -r requirements.txt`
-4. To use the C++ implementation, first install the kernel via `cd mesh_renderer/kernel && python setup.py install`, then change the hardcoded config variable `USE_CPP_RASTERIZER` as described below.
+4. To use the C++ implementation, first install the kernel via `cd src/mesh_renderer/kernel && python setup.py install`, then change the hardcoded config variable `USE_CPP_RASTERIZER` as described below.
 
 # Testing
 
-To test the rasterizer module:
+To test the rasterizer module, run from the repository root:
 ```
-cd mesh_renderer
-python rasterize_triangles_test.py
+python -m src.mesh_renderer.rasterize_triangles_test
 ```
 
-To test the mesh renderer:
+To test the mesh renderer, run from the repository root:
 
 ```
-cd mesh_renderer
-python mesh_renderer_test.py
+python -m src.mesh_renderer.mesh_renderer_test
 ```
 
 # Usage
@@ -126,12 +124,12 @@ There are two implementations of the low-level `rasterize` API.
 
 ### C++ kernel
 
-This implementation is written in C++ for performance. Since it doesn't use PyTorch built-in functions under-the-hood and instead [extends `torch.autograd.Function`](https://pytorch.org/docs/stable/notes/extending.html#extending-autograd), the backward pass is explicitly written rather than just being implicit in the forward pass. Both are written in the [C++ extension](https://pytorch.org/tutorials/advanced/cpp_extension.html) in `mesh_renderer/kernels/rasterize_triangles.cpp`, with the wrapper code in `mesh_renderer/rasterize_triangles_hard.py`.
+This implementation is written in C++ for performance. Since it doesn't use PyTorch built-in functions under-the-hood and instead [extends `torch.autograd.Function`](https://pytorch.org/docs/stable/notes/extending.html#extending-autograd), the backward pass is explicitly written rather than just being implicit in the forward pass. Both are written in the [C++ extension](https://pytorch.org/tutorials/advanced/cpp_extension.html) in `src/mesh_renderer/kernels/rasterize_triangles.cpp`, with the wrapper code in `src/mesh_renderer/rasterize_triangles_hard.py`.
 
-This implementation is enabled by setting the hard-coded global variable `USE_CPP_RASTERIZER = True` in `mesh_renderer/rasterize_triangles.py`.
+This implementation is enabled by setting the hard-coded global variable `USE_CPP_RASTERIZER = True` in `src/mesh_renderer/rasterize_triangles.py`.
 
 ### Python-only kernel
 
-This implementation is written in Python only in `mesh_renderer/rasterize_triangles_soft.py` and leverages PyTorch built-in functions for autograd. It's much shorter than the C++ kernel and is intended to be simpler to understand. However, performance is much worse. 
+This implementation is written in Python only in `src/mesh_renderer/rasterize_triangles_soft.py` and leverages PyTorch built-in functions for autograd. It's much shorter than the C++ kernel and is intended to be simpler to understand. However, performance is much worse. 
 
-This implementation is enabled by setting the hard-coded global variable `USE_CPP_RASTERIZER = False` in `mesh_renderer/rasterize_triangles.py`. This is the default.
+This implementation is enabled by setting the hard-coded global variable `USE_CPP_RASTERIZER = False` in `src/mesh_renderer/rasterize_triangles.py`. This is the default.

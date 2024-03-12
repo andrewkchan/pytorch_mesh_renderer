@@ -1,23 +1,25 @@
-"""Differentiable triangle rasterizer."""
+"""
+Differentiable triangle rasterizer using Genova 2018 un-clipped 
+barycentric formulation.
+"""
 
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
 import torch
 
-from mesh_renderer import camera_utils
+from ..common import camera_utils
 
-USE_CPP_RASTERIZER = False
+USE_CPP_RASTERIZER = True
 def rasterize_barycentric(clip_space_vertices, triangles, image_width, image_height):
     if USE_CPP_RASTERIZER:
-        from mesh_renderer import rasterize_triangles_hard
+        from . import rasterize_triangles_hard
         return rasterize_triangles_hard.BarycentricRasterizer.apply(
             clip_space_vertices, triangles, image_width, image_height
         )
     else:
-        from mesh_renderer import rasterize_triangles_soft
+        from . import rasterize_triangles_soft
         return rasterize_triangles_soft.rasterize_barycentric(
             clip_space_vertices, triangles, image_width, image_height
         )

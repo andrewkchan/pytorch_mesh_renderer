@@ -43,7 +43,7 @@ if __name__ == "__main__":
     image_width = 640
     image_height = 480
 
-    render = mr.mesh_renderer(
+    render = mr.render(
         vertices, triangles, normals,
         vertex_diffuse_colors, eye, center, world_up, light_positions,
         light_intensities, image_width, image_height)

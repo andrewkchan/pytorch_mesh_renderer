@@ -8,14 +8,14 @@ import unittest
 import numpy as np
 import torch
 
-from mesh_renderer import camera_utils
-from mesh_renderer.rasterize_triangles import rasterize, rasterize_barycentric
-from mesh_renderer import test_utils
+from ..common import camera_utils
+from .rasterize import rasterize, rasterize_barycentric
+from . import test_utils
 
 
 class RenderTest(unittest.TestCase):
     def setUp(self):
-        self.test_data_directory = "test_data/"
+        self.test_data_directory = os.path.join(os.path.dirname(os.path.realpath(__file__)), "./test_data/")
 
         self.cube_vertex_positions = torch.tensor(
             [[-1, -1, 1], [-1, -1, -1], [-1, 1, -1], [-1, 1, 1], [1, -1, 1],

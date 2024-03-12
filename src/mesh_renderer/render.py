@@ -1,4 +1,7 @@
-"""Differentiable 3D rendering of a triangle mesh."""
+"""
+Differentiable 3D rendering of a triangle mesh based on the
+sampled un-clipped barycentric approach from Genova 2018.
+"""
 
 from __future__ import absolute_import
 from __future__ import division
@@ -6,11 +9,11 @@ from __future__ import print_function
 
 import torch
 
-from mesh_renderer import camera_utils
-from mesh_renderer.rasterize_triangles import rasterize
+from ..common import camera_utils
+from .rasterize import rasterize
 
 
-def mesh_renderer(
+def render(
     vertices,
     triangles,
     normals,

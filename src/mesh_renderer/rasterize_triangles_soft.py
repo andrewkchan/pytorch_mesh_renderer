@@ -1,4 +1,4 @@
-from mesh_renderer import camera_utils
+from ..common import camera_utils
 import torch
 import math
 
@@ -120,6 +120,7 @@ def rasterize_barycentric(clip_space_vertices, triangles, image_width, image_hei
                 else:
                     # get perspective-correct barycentric coordinates
                     bc = torch.nn.functional.normalize(bc_screen / proj_v012_w.T[0], dim=0, p=1)
+                    # TODO: shouldn't this be perspective-corrected z? bug?
                     z = vertex_depths @ bc_screen
                     if z < 0.0 or z > 1.0 or z > z_buffer[y][x]:
                         continue

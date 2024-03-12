@@ -61,7 +61,7 @@ if __name__ == "__main__":
         forward = torch.reshape(torch.matmul(-initial_eye, camera_euler_transforms.T), [1, 3])
         world_up = torch.reshape(torch.matmul(initial_world_up, camera_euler_transforms.T), [1, 3])
         center = eye + forward
-        render = mr.mesh_renderer(
+        render = mr.render(
             vertices, triangles, normals,
             vertex_diffuse_colors, eye, center, world_up, light_positions,
             light_intensities, image_width, image_height)

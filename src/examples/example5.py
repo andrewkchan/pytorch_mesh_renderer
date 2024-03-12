@@ -60,7 +60,7 @@ if __name__ == "__main__":
         light_positions = torch.reshape(eye, [1, 1, 3])
         light_intensities = torch.ones([1, 1, 3], dtype=torch.float32)
 
-        render = mr.mesh_renderer(
+        render = mr.render(
             vertices_world_space, cube_triangles, normals_world_space,
             vertex_diffuse_colors, eye, center, world_up, light_positions,
             light_intensities, image_width, image_height)
