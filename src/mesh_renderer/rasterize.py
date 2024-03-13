@@ -1,5 +1,5 @@
 """
-Differentiable triangle rasterizer using Genova 2018 un-clipped 
+Differentiable triangle rasterizer using Genova 2018 un-clipped
 barycentric formulation.
 """
 
@@ -14,13 +14,13 @@ from ..common import camera_utils
 USE_CPP_RASTERIZER = True
 def rasterize_barycentric(clip_space_vertices, triangles, image_width, image_height):
     if USE_CPP_RASTERIZER:
-        from . import rasterize_triangles_hard
-        return rasterize_triangles_hard.BarycentricRasterizer.apply(
+        from . import rasterize_triangles_ext
+        return rasterize_triangles_ext.BarycentricRasterizer.apply(
             clip_space_vertices, triangles, image_width, image_height
         )
     else:
-        from . import rasterize_triangles_soft
-        return rasterize_triangles_soft.rasterize_barycentric(
+        from . import rasterize_triangles_python
+        return rasterize_triangles_python.rasterize_barycentric(
             clip_space_vertices, triangles, image_width, image_height
         )
 

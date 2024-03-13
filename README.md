@@ -89,7 +89,7 @@ An example usage of the `rasterize` API to rasterize a cube can be found in the 
 
 This file contains some utilities that may be useful for transforming the input scene before rendering. The `mesh_renderer` function uses some of these functions internally to project the world-space vertices into camera-space. Model-view-perspective projection matrices are also required as input to the lower-level rasterization APIs.
 
-### `euler_matrices`. 
+### `euler_matrices`.
 
 You can use this to create a Model matrix with rotation to transform a set of object-space vertices into world space before rendering it.
 
@@ -124,12 +124,12 @@ There are two implementations of the low-level `rasterize` API.
 
 ### C++ kernel
 
-This implementation is written in C++ for performance. Since it doesn't use PyTorch built-in functions under-the-hood and instead [extends `torch.autograd.Function`](https://pytorch.org/docs/stable/notes/extending.html#extending-autograd), the backward pass is explicitly written rather than just being implicit in the forward pass. Both are written in the [C++ extension](https://pytorch.org/tutorials/advanced/cpp_extension.html) in `src/mesh_renderer/kernels/rasterize_triangles.cpp`, with the wrapper code in `src/mesh_renderer/rasterize_triangles_hard.py`.
+This implementation is written in C++ for performance. Since it doesn't use PyTorch built-in functions under-the-hood and instead [extends `torch.autograd.Function`](https://pytorch.org/docs/stable/notes/extending.html#extending-autograd), the backward pass is explicitly written rather than just being implicit in the forward pass. Both are written in the [C++ extension](https://pytorch.org/tutorials/advanced/cpp_extension.html) in `src/mesh_renderer/kernels/rasterize_triangles.cpp`, with the wrapper code in `src/mesh_renderer/rasterize_triangles_ext.py`.
 
 This implementation is enabled by setting the hard-coded global variable `USE_CPP_RASTERIZER = True` in `src/mesh_renderer/rasterize_triangles.py`.
 
 ### Python-only kernel
 
-This implementation is written in Python only in `src/mesh_renderer/rasterize_triangles_soft.py` and leverages PyTorch built-in functions for autograd. It's much shorter than the C++ kernel and is intended to be simpler to understand. However, performance is much worse. 
+This implementation is written in Python only in `src/mesh_renderer/rasterize_triangles_python.py` and leverages PyTorch built-in functions for autograd. It's much shorter than the C++ kernel and is intended to be simpler to understand. However, performance is much worse.
 
 This implementation is enabled by setting the hard-coded global variable `USE_CPP_RASTERIZER = False` in `src/mesh_renderer/rasterize_triangles.py`. This is the default.
