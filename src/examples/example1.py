@@ -9,7 +9,8 @@ import torch
 import numpy as np
 from skimage import io
 
-import mesh_renderer as mr
+from .. import mesh_renderer as mr
+from ..common import obj_utils
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 data_dir = os.path.join(current_dir, '.')
@@ -21,7 +22,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # load obj file
-    vertices, triangles, normals = mr.load_obj(args.filename_input)
+    vertices, triangles, normals = obj_utils.load_obj(args.filename_input)
     vertices = vertices[None,:,:] # [num_vertices, 3] -> [batch_size=1, num_vertices, 3]
     # TODO why are triangles not batched?
     normals = normals[None,:,:] # [num_vertices, 3] -> [batch_size=1, num_vertices, 3]
@@ -30,9 +31,6 @@ if __name__ == "__main__":
     eye = torch.tensor([[0.0, 0.0, 3.0]], dtype=torch.float32)
     center = torch.tensor([[0.0, 0.0, 0.0]], dtype=torch.float32)
     world_up = torch.tensor([[0.0, 1.0, 0.0]], dtype=torch.float32)
-
-    eye = torch.tensor([0.0, 3.0, 3.0], dtype=torch.float32)
-    world_up = torch.tensor([0.0, np.cos(-np.pi/4.), np.sin(-np.pi/4.)], dtype=torch.float32)
 
     # create a diffuse colors tensor coloring all vertices white
     vertex_diffuse_colors = torch.ones_like(vertices, dtype=torch.float32)

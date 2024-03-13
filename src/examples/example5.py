@@ -12,6 +12,7 @@ import imageio
 import matplotlib.pyplot as plt
 
 import mesh_renderer as mr
+from ..common import camera_utils
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 data_dir = os.path.join(current_dir, '.')
@@ -36,12 +37,12 @@ if __name__ == "__main__":
         [[0, 1, 2], [2, 3, 0], [3, 2, 6], [6, 7, 3], [7, 6, 5], [5, 4, 7],
             [4, 5, 1], [1, 0, 4], [5, 6, 2], [2, 1, 5], [7, 4, 0], [0, 3, 7]],
         dtype=torch.int32)
-    
+
     initial_euler_angles = [[0.0, 0.0, 0.0]]
     euler_angles = torch.tensor(initial_euler_angles, requires_grad=True)
 
     def render_cube_with_rotation(input_euler_angles):
-        model_rotation = mr.euler_matrices(input_euler_angles)[0, :3, :3] # [3, 3]
+        model_rotation = camera_utils.euler_matrices(input_euler_angles)[0, :3, :3] # [3, 3]
 
         vertices_world_space = torch.reshape(
             torch.matmul(cube_vertices, model_rotation.T),
@@ -76,12 +77,12 @@ if __name__ == "__main__":
     def stepfn():
         optimizer.zero_grad()
         render = render_cube_with_rotation(euler_angles)
-        
+
         # write to GIF output
         frame = render.detach().numpy() # [image_height, image_width, 4]
         # black background
         frame = np.concatenate([
-            frame[:,:,:3]*frame[:,:,3][:,:,None], 
+            frame[:,:,:3]*frame[:,:,3][:,:,None],
             np.ones([image_height, image_width, 1], dtype=np.float32)
         ], axis=-1)
         writer.append_data((255*frame).astype(np.uint8))

@@ -13,7 +13,9 @@ from skimage import io
 import imageio
 import matplotlib.pyplot as plt
 
-import mesh_renderer as mr
+from .. import mesh_renderer as mr
+from ..common import obj_utils
+from ..common import camera_utils
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 data_dir = os.path.join(current_dir, '.')
@@ -26,7 +28,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # load obj file
-    vertices, triangles, normals = mr.load_obj(args.filename_input)
+    vertices, triangles, normals = obj_utils.load_obj(args.filename_input)
     vertices = vertices[None,:,:] # [num_vertices, 3] -> [batch_size=1, num_vertices, 3]
     # TODO why are triangles not batched?
     normals = normals[None,:,:] # [num_vertices, 3] -> [batch_size=1, num_vertices, 3]
@@ -56,8 +58,8 @@ if __name__ == "__main__":
     optimizer = torch.optim.SGD([eye, camera_euler_angles], 0.7, 0.1)
     def stepfn():
         optimizer.zero_grad()
-        
-        camera_euler_transforms = mr.euler_matrices(camera_euler_angles)[0, :3, :3] # [3, 3]
+
+        camera_euler_transforms = camera_utils.euler_matrices(camera_euler_angles)[0, :3, :3] # [3, 3]
         forward = torch.reshape(torch.matmul(-initial_eye, camera_euler_transforms.T), [1, 3])
         world_up = torch.reshape(torch.matmul(initial_world_up, camera_euler_transforms.T), [1, 3])
         center = eye + forward
@@ -65,12 +67,12 @@ if __name__ == "__main__":
             vertices, triangles, normals,
             vertex_diffuse_colors, eye, center, world_up, light_positions,
             light_intensities, image_width, image_height)
-        
+
         # write to GIF output
         frame = render[0].detach().numpy() # [image_height, image_width, 4]
         # black background
         frame = np.concatenate([
-            frame[:,:,:3]*frame[:,:,3][:,:,None], 
+            frame[:,:,:3]*frame[:,:,3][:,:,None],
             np.ones([image_height, image_width, 1], dtype=np.float32)
         ], axis=-1)
         writer.append_data((255*frame).astype(np.uint8))

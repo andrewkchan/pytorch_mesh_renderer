@@ -1,4 +1,3 @@
-from .obj_utils import load_obj
 from .render import render, tone_mapper
 from .rasterize import rasterize
 

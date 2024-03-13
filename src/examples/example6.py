@@ -14,7 +14,9 @@ from skimage import io
 import imageio
 import matplotlib.pyplot as plt
 
-import mesh_renderer as mr
+from .. import mesh_renderer as mr
+from ..common import obj_utils
+from ..common import camera_utils
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 data_dir = os.path.join(current_dir, '.')
@@ -30,7 +32,7 @@ if __name__ == "__main__":
     image_height = 480
 
     # load obj file
-    vertices, triangles, normals = mr.load_obj(args.filename_input)
+    vertices, triangles, normals = obj_utils.load_obj(args.filename_input)
     vertices = vertices[None,:,:] # [num_vertices, 3] -> [batch_size=1, num_vertices, 3]
     # TODO why are triangles not batched?
     normals = normals[None,:,:] # [num_vertices, 3] -> [batch_size=1, num_vertices, 3]
@@ -43,18 +45,18 @@ if __name__ == "__main__":
     vertex_diffuse_colors = torch.ones_like(vertices, dtype=torch.float32)
     light_positions = torch.tensor([[[0.0, 3.0, 0.0]]], dtype=torch.float32)
     light_intensities = torch.ones([1, 1, 3], dtype=torch.float32)
-    
+
     initial_euler_angles = [[np.pi/4., 0., 0.]]
     euler_angles = torch.tensor(initial_euler_angles, requires_grad=True)
 
     def render_with_rotation(input_euler_angles):
-        model_rotation = mr.euler_matrices(input_euler_angles)[0, :3, :3] # [3, 3]
+        model_rotation = camera_utils.euler_matrices(input_euler_angles)[0, :3, :3] # [3, 3]
 
         vertices_world_space = torch.matmul(vertices, model_rotation.T)
         # normals must be transformed using the inverse of the transpose of a matrix M
         normals_world_space = torch.matmul(normals, torch.inverse(model_rotation.T).T)
 
-        render = mr.mesh_renderer(
+        render = mr.render(
             vertices_world_space, triangles, normals_world_space,
             vertex_diffuse_colors, eye, center, world_up, light_positions,
             light_intensities, image_width, image_height)
@@ -70,12 +72,12 @@ if __name__ == "__main__":
     def stepfn():
         optimizer.zero_grad()
         render = render_with_rotation(euler_angles)
-        
+
         # write to GIF output
         frame = render.detach().numpy() # [image_height, image_width, 4]
         # black background
         frame = np.concatenate([
-            frame[:,:,:3]*frame[:,:,3][:,:,None], 
+            frame[:,:,:3]*frame[:,:,3][:,:,None],
             np.ones([image_height, image_width, 1], dtype=np.float32)
         ], axis=-1)
         writer.append_data((255*frame).astype(np.uint8))
