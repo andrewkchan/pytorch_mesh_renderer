@@ -148,6 +148,7 @@ class RenderTest(unittest.TestCase):
         ##############################################################
         # Case 2: blur radius spans a single screen-space pixel
         ##############################################################
+        # TODO: shouldn't this be double? since it's in NDC space which is from [-1,+1], not [0,1]
         blur_radius2 = 0.1 * np.sqrt(2.0) + 1e-6
         # This will cause samples blur_radius2 away from a triangle to
         # have a nonzero coverage (1e-3) by the triangle. This will allow
@@ -191,6 +192,121 @@ class RenderTest(unittest.TestCase):
         torch.testing.assert_close(output2[..., 1], expected_green2)
         torch.testing.assert_close(output2[..., 2], expected_blue2)
         torch.testing.assert_close(output2[..., 3], expected_alpha2)
+
+    def test_optimize_single_triangle_translation(self):
+        """
+        Test optimizing a single triangle's xy-translation.
+
+        The test proceeds by rasterizing a single triangle to a 10x10 image.
+        The starting triangle slightly overlaps the target triangle. To
+        reach the target, the triangle must be translated to the right by its
+        full length.
+        """
+        # in eye space: z=-1 for all vertices, znear=0.5, zfar=2.5
+        translation_x = torch.tensor(0.0, requires_grad=True)
+        target_translation_x = 0.5
+        clip_space_vertices = torch.tensor(
+            [
+                [-0.5, 0.0, 0.25, 1.0],
+                [0.5, 1.0, 0.25, 1.0],
+                [-0.5, 1.0, 0.25, 1.0],
+            ],
+            dtype=torch.float32
+        )
+        triangles = torch.tensor([[0, 1, 2]], dtype=torch.int32)
+        world_space_vertices = torch.tensor(
+            [
+                [-1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [-1.0, 1.0, 0.0],
+            ],
+            dtype=torch.float32
+        )
+        normals = torch.tensor(
+            [
+                [0.0, 0.0, 1.0],
+                [0.0, 0.0, 1.0],
+                [0.0, 0.0, 1.0],
+            ],
+            dtype=torch.float32
+        )
+        diffuse_colors = torch.tensor(
+            [
+                [1.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+            ],
+            dtype=torch.float32
+        )
+        # one light at effectively infinity
+        light_positions = torch.tensor([[0.0, 0.0, 100000.0]], dtype=torch.float32)
+        light_intensities = torch.tensor([1.0], dtype=torch.float32)
+        image_width, image_height = 10, 10
+        sigma_val = 1e-5
+        gamma_val = 1e-1
+
+        # rasterize target image
+        target_output = rasterize_batch(
+            clip_space_vertices + torch.tensor([target_translation_x, 0.0, 0.0, 0.0]),
+            triangles,
+            ### vertex attributes
+            world_space_vertices + torch.tensor([target_translation_x, 0.0, 0.0]),
+            normals,
+            diffuse_colors,
+            ### lighting
+            light_positions,
+            light_intensities,
+            ###
+            image_width,
+            image_height,
+            sigma_val,
+            gamma_val,
+            0.01 # target image should not be blurred
+        )
+
+        def stepfn():
+            clip_space_translation = torch.zeros_like(clip_space_vertices)
+            world_space_translation = torch.zeros_like(world_space_vertices)
+            clip_space_translation[:, 0] = translation_x
+            world_space_translation[:, 0] = translation_x
+
+            blur_radius = 0.1 + 1e-6 # intermediate steps must blur enough to capture coverage gradients
+            sigma_val = -blur_radius**2 / torch.special.logit(torch.tensor(1e-6))
+
+            output = rasterize_batch(
+                clip_space_vertices + clip_space_translation,
+                triangles,
+                ### vertex attributes
+                world_space_vertices + world_space_translation,
+                normals,
+                diffuse_colors,
+                ### lighting
+                light_positions,
+                light_intensities,
+                ###
+                image_width,
+                image_height,
+                sigma_val,
+                gamma_val,
+                blur_radius
+            )
+
+            debug_utils.debug_tensor(output[:,:,0], "output[:,:,0]")
+            debug_utils.debug_tensor(target_output[:,:,0], "target_output[:,:,0]")
+
+            loss = torch.mean(torch.abs(output - target_output))
+            loss.backward()
+            return loss
+
+        # optimization loop: rasterize then backwards until optimized
+        optimizer = torch.optim.SGD([translation_x], 0.7, 0.1)
+        for e in range(50):
+            optimizer.zero_grad()
+            optimizer.step(stepfn)
+            print("step {} translation_x.grad={}".format(e, translation_x.grad))
+
+        torch.testing.assert_close(float(translation_x), target_translation_x)
+
 
 if __name__ == "__main__":
     unittest.main()
