@@ -199,8 +199,8 @@ def compute_shaded_color(
 
     return diffuse_output
 
-# TODO calibrate these constants
-EPS = 1e-3 # used to give background color a constant small probability
+SHOW_DEBUG_LOGS = False
+EPS = 1e-10 # used to give background color a constant small probability
 def rasterize_batch(
     clip_space_vertices,
     triangles,
@@ -405,7 +405,9 @@ def rasterize_batch(
             row_samples_drawn += samples_drawn
             row_max_samples_drawn = max(row_max_samples_drawn, samples_drawn)
             total_samples += samples_drawn
-        print("drew {} samples (max={}) for row y={}".format(row_samples_drawn, row_max_samples_drawn, y))
-    print("drew {} samples total".format(total_samples))
+        if SHOW_DEBUG_LOGS:
+            print("drew {} samples (max={}) for row y={}".format(row_samples_drawn, row_max_samples_drawn, y))
+    if SHOW_DEBUG_LOGS:
+        print("drew {} samples total".format(total_samples))
 
     return result

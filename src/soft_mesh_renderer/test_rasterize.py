@@ -148,12 +148,11 @@ class RenderTest(unittest.TestCase):
         ##############################################################
         # Case 2: blur radius spans a single screen-space pixel
         ##############################################################
-        # TODO: shouldn't this be double? since it's in NDC space which is from [-1,+1], not [0,1]
+        # Add a small epsilon to capture samples right on the edge.
         blur_radius2 = 0.1 * np.sqrt(2.0) + 1e-6
         # This will cause samples blur_radius2 away from a triangle to
-        # have a nonzero coverage (1e-3) by the triangle. This will allow
-        # the triangle to participate in softmax, which should spike the
-        # coverage to 1.0.
+        # have a nonzero coverage (1e-3) by the triangle. This is needed
+        # for samples that lie exactly on the edge to work.
         sigma_val2 = -blur_radius2**2 / torch.special.logit(torch.tensor(1e-3))
         output2 = rasterize_batch(
             clip_space_vertices,
