@@ -141,11 +141,11 @@ def barycentric_edge(M, M_inv, p):
     d = torch.stack([v01_nearest, v12_nearest, v20_nearest]) - p[:2]
     mindist_sq, argmin = torch.min(torch.sum(d * d, dim=-1), dim=0)
     if argmin == 0:
-        return bc_p, mindist_sq, torch.tensor([1. - t01, t01, 0.])
+        return bc_p, mindist_sq, torch.stack([1. - t01, t01, torch.tensor(0.)])
     elif argmin == 1:
-        return bc_p, mindist_sq, torch.tensor([0., 1. - t12, t12])
+        return bc_p, mindist_sq, torch.stack([torch.tensor(0.), 1. - t12, t12])
     else:
-        return bc_p, mindist_sq, torch.tensor([t20, 0., 1. - t20])
+        return bc_p, mindist_sq, torch.stack([t20, torch.tensor(0.), 1. - t20])
 
 # Returns the point on a 2D line segment which is nearest to the input point,
 # and the number t between [0, 1] giving how far that is on the segment.
@@ -377,10 +377,11 @@ def rasterize_batch(
                 soft_weights[i] = z / gamma_val
                 samples_drawn += 1
 
-            bg_weight = torch.tensor(EPS / gamma_val)
-            max_soft_weight = max(torch.max(soft_weights), EPS / gamma_val)
+            max_soft_weight = max(torch.max(soft_weights), torch.tensor(EPS / gamma_val))
             soft_weights = soft_fragments * torch.exp(soft_weights - max_soft_weight)
-            bg_weight = torch.exp(bg_weight - max_soft_weight)
+
+            # background weight should never be zero.
+            bg_weight = max(torch.exp(EPS / gamma_val - max_soft_weight), EPS)
 
             # normalize all logits
             sum_weights = torch.sum(soft_weights) + bg_weight
