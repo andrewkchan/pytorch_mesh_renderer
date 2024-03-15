@@ -11,7 +11,7 @@ import torch
 
 from ..common import camera_utils
 
-USE_CPP_RASTERIZER = True
+USE_CPP_RASTERIZER = False
 def rasterize_barycentric(clip_space_vertices, triangles, image_width, image_height):
     if USE_CPP_RASTERIZER:
         from . import rasterize_triangles_ext

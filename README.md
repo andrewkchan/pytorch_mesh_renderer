@@ -10,6 +10,8 @@ This repository contains implementations of two differentiable 3D mesh renderers
 2. Activate it with `source env/bin/activate`
 3. Install external dependencies with `pip install -r requirements.txt`
 
+Some additional setup is required to use the optimized kernel for the barycentric renderer. See [docs](https://github.com/andrewkchan/pytorch_mesh_renderer/blob/master/src/mesh_renderer/README.md) for more.
+
 # Testing
 
 Tests are included for both renderers.
