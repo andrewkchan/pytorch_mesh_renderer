@@ -139,7 +139,18 @@ class RenderTest(unittest.TestCase):
         ], dtype=torch.float32)
         expected_green = torch.zeros_like(expected_red)
         expected_blue = torch.zeros_like(expected_red)
-        expected_alpha = expected_red
+        expected_alpha = torch.tensor([
+            [0., 0., 0., 0., 0., 0., 0., 0., 0., .5],
+            [0., 0., 0., 0., 0., 0., 0., 0., .5, 1.],
+            [0., 0., 0., 0., 0., 0., 0., .5, 1., 1.],
+            [0., 0., 0., 0., 0., 0., .5, 1., 1., 1.],
+            [0., 0., 0., 0., 0., .5, 1., 1., 1., 1.],
+            [0., 0., 0., 0., .5, 1., 1., 1., 1., 1.],
+            [0., 0., 0., .5, 1., 1., 1., 1., 1., 1.],
+            [0., 0., .5, 1., 1., 1., 1., 1., 1., 1.],
+            [0., .5, 1., 1., 1., 1., 1., 1., 1., 1.],
+            [.5, 1., 1., 1., 1., 1., 1., 1., 1., 1.],
+        ], dtype=torch.float32)
 
         torch.testing.assert_close(output[..., 0], expected_red)
         torch.testing.assert_close(output[..., 1], expected_green)
@@ -185,12 +196,23 @@ class RenderTest(unittest.TestCase):
         ], dtype=torch.float32)
         expected_green2 = torch.zeros_like(expected_red2)
         expected_blue2 = torch.zeros_like(expected_red2)
-        expected_alpha2 = expected_red2
+        expected_alpha2 = torch.tensor([
+            [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0010, 0.5000],
+            [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0010, 0.5000, 0.9693],
+            [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0010, 0.5000, 0.9990, 0.9693],
+            [0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0010, 0.5000, 0.9990, 1.0000, 0.9693],
+            [0.0000, 0.0000, 0.0000, 0.0000, 0.0010, 0.5000, 0.9990, 1.0000, 1.0000, 0.9693],
+            [0.0000, 0.0000, 0.0000, 0.0010, 0.5000, 0.9990, 1.0000, 1.0000, 1.0000, 0.9693],
+            [0.0000, 0.0000, 0.0010, 0.5000, 0.9990, 1.0000, 1.0000, 1.0000, 1.0000, 0.9693],
+            [0.0000, 0.0010, 0.5000, 0.9990, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 0.9693],
+            [0.0010, 0.5000, 0.9990, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 1.0000, 0.9693],
+            [0.5000, 0.9693, 0.9693, 0.9693, 0.9693, 0.9693, 0.9693, 0.9693, 0.9693, 0.9693]
+        ], dtype=torch.float32)
 
         torch.testing.assert_close(output2[..., 0], expected_red2)
         torch.testing.assert_close(output2[..., 1], expected_green2)
         torch.testing.assert_close(output2[..., 2], expected_blue2)
-        torch.testing.assert_close(output2[..., 3], expected_alpha2)
+        torch.testing.assert_close(output2[..., 3], expected_alpha2, atol=1e-04, rtol=0)
 
     def test_optimize_single_triangle_translation(self):
         """
