@@ -258,6 +258,13 @@ def rasterize_batch(
     Returns:
         A 3D float32 tensor of shape [image_height, image_width, 4]
         containing the lit RGBA color values at each pixel.
+        The RGB values are aggregated per-pixel according to the color aggregation
+        formula in [1].
+        The alpha values are aggregared per-pixel according to the silhouette
+        formula in [1].
+
+    [1] Shichen Liu et al, 'Soft Rasterizer: A Differentiable Renderer for
+    Image-based 3D Reasoning'
     """
     sq_blur_radius = blur_radius**2
     result = torch.zeros([image_height, image_width, 4], dtype=torch.float32)
@@ -297,7 +304,7 @@ def rasterize_batch(
 
             soft_weights = torch.zeros([len(triangles)])
             soft_fragments = torch.zeros([len(triangles)])
-            soft_colors = torch.zeros([len(triangles), 4])
+            soft_colors = torch.zeros([len(triangles), 3])
 
             samples_drawn = 0
             for i in range(len(triangles)):
@@ -366,7 +373,6 @@ def rasterize_batch(
                     light_positions,
                     light_intensities,
                 )
-                soft_colors[i, 3] = 1.0
 
                 sgn = 1. if is_inside else -1.
                 soft_fragments[i] = torch.special.expit(sgn * sq_dist / sigma_val)
@@ -388,7 +394,13 @@ def rasterize_batch(
             soft_weights = soft_weights / sum_weights
 
             # bg color is transparent, otherwise we'd add `(bg_weight / sum_weights) * bg_color`
-            result[y][x] = soft_weights @ soft_colors
+            result[y][x][:3] = soft_weights @ soft_colors
+
+            # Compute the silhouette score, which is based on the probability that
+            # at least 1 triangle covers the pixel. This is 1 - probability that
+            # all triangles do not cover the pixel.
+            silhouette = 1.0 - torch.prod((1.0 - soft_fragments))
+            result[y][x][3] = silhouette
 
             row_samples_drawn += samples_drawn
             row_max_samples_drawn = max(row_max_samples_drawn, samples_drawn)

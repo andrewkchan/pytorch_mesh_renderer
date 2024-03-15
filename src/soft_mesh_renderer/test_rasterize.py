@@ -202,9 +202,9 @@ class RenderTest(unittest.TestCase):
         reach the target, the triangle must be translated to the right by its
         full length.
         """
+        translation_x = torch.tensor(0., requires_grad=True)
+        target_translation_x = 0.25
         # in eye space: z=-1 for all vertices, znear=0.5, zfar=2.5
-        translation_x = torch.tensor(0.0, requires_grad=True)
-        target_translation_x = 0.5
         clip_space_vertices = torch.tensor(
             [
                 [-0.5, 0.0, 0.25, 1.0],
@@ -216,9 +216,9 @@ class RenderTest(unittest.TestCase):
         triangles = torch.tensor([[0, 1, 2]], dtype=torch.int32)
         world_space_vertices = torch.tensor(
             [
-                [-1.0, 0.0, 0.0],
-                [0.0, 1.0, 0.0],
-                [-1.0, 1.0, 0.0],
+                [-0.5, 0.0, 0.0],
+                [0.5, 1.0, 0.0],
+                [-0.5, 1.0, 0.0],
             ],
             dtype=torch.float32
         )
@@ -264,14 +264,14 @@ class RenderTest(unittest.TestCase):
             0.01 # target image should not be blurred
         )
 
+        blur_radius = 0.0
+        sigma_saturation_radius = 0.5
+        sigma_val = -sigma_saturation_radius**2 / torch.special.logit(torch.tensor(1e-5))
         def stepfn():
             clip_space_translation = torch.zeros_like(clip_space_vertices)
             world_space_translation = torch.zeros_like(world_space_vertices)
             clip_space_translation[:, 0] = translation_x
             world_space_translation[:, 0] = translation_x
-
-            blur_radius = 0.1 + 1e-6 # intermediate steps must blur enough to capture coverage gradients
-            sigma_val = -blur_radius**2 / torch.special.logit(torch.tensor(1e-6))
 
             output = rasterize_batch(
                 clip_space_vertices + clip_space_translation,
@@ -291,9 +291,6 @@ class RenderTest(unittest.TestCase):
                 blur_radius
             )
 
-            debug_utils.debug_tensor(output[:,:,0], "output[:,:,0]")
-            debug_utils.debug_tensor(target_output[:,:,0], "target_output[:,:,0]")
-
             loss = torch.mean(torch.abs(output - target_output))
             loss.backward()
             return loss
@@ -303,9 +300,9 @@ class RenderTest(unittest.TestCase):
         for e in range(50):
             optimizer.zero_grad()
             optimizer.step(stepfn)
-            print("step {} translation_x.grad={}".format(e, translation_x.grad))
 
-        torch.testing.assert_close(float(translation_x), target_translation_x)
+        pixel_width = 0.2 # 10x10 grid and NDC range from -1.0 to +1.0
+        torch.testing.assert_close(float(translation_x), target_translation_x, atol=pixel_width/2, rtol=0.0)
 
 
 if __name__ == "__main__":
