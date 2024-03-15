@@ -120,34 +120,32 @@ def barycentric(M_inv, p):
     return M_inv @ p
 
 # Returns barycentric coordinates of a point P (in homogeneous 3D coordinates xyz)
-# w.r.t. triangle v0, v1, v2.
-# If the point P lies outside of the triangle, the return value will be the barycentric
-# coordinates of the point on the triangle closest to P.
+# w.r.t. triangle v0, v1, v2, the same for the point on the edge of the triangle nearest to P,
+# and the distance between them.
 # Args:
 # - p: 3D point, a tensor with shape [3].
 # - M: A 3x3 matrix where the columns are the vertices v0, v1, v2 of the triangle.
 # - M_inv: The inverse of M.
 #
 # Returns:
-# - is_inside: Boolean giving whether or not p is inside the triangle.
+# - bc_p: 1D tensor of shape [3] giving barycentric coordinates for p.
+#         If p is outside the triangle, one of the coordinates will be negative.
 # - mindist_sq: scalar tensor (float) giving the squared distance from p to the nearest point.
-# - bc: 1D tensor of shape [3] giving barycentric coordinates for the nearest point.
-def barycentric_nearest(M, M_inv, p):
-    bc = barycentric(M_inv, p)
-    is_inside = not torch.any(bc < 0.)
-    if is_inside:
-        return is_inside, torch.tensor(0.), bc
+# - bc_edge: 1D tensor of shape [3] giving barycentric coordinates for the nearest point
+#               on the edge of the triangle.
+def barycentric_edge(M, M_inv, p):
+    bc_p = barycentric(M_inv, p)
     v01_nearest, t01 = point_to_segment_nearest(p[:2], M[:, 0][:2], M[:, 1][:2])
     v12_nearest, t12 = point_to_segment_nearest(p[:2], M[:, 1][:2], M[:, 2][:2])
     v20_nearest, t20 = point_to_segment_nearest(p[:2], M[:, 2][:2], M[:, 0][:2])
     d = torch.stack([v01_nearest, v12_nearest, v20_nearest]) - p[:2]
     mindist_sq, argmin = torch.min(torch.sum(d * d, dim=-1), dim=0)
     if argmin == 0:
-        return is_inside, mindist_sq, torch.tensor([1. - t01, t01, 0.])
+        return bc_p, mindist_sq, torch.tensor([1. - t01, t01, 0.])
     elif argmin == 1:
-        return is_inside, mindist_sq, torch.tensor([0., 1. - t12, t12])
+        return bc_p, mindist_sq, torch.tensor([0., 1. - t12, t12])
     else:
-        return is_inside, mindist_sq, torch.tensor([t20, 0., 1. - t20])
+        return bc_p, mindist_sq, torch.tensor([t20, 0., 1. - t20])
 
 # Returns the point on a 2D line segment which is nearest to the input point,
 # and the number t between [0, 1] giving how far that is on the segment.
@@ -324,7 +322,7 @@ def rasterize_batch(
                     ndc_y < torch.min(ndc_M[1, :]) - blur_radius or
                     ndc_y > torch.max(ndc_M[1, :]) + blur_radius):
                     continue
-                is_inside, sq_dist, bc_screen = barycentric_nearest(
+                bc_screen, sq_dist, bc_edge_screen = barycentric_edge(
                     # Note: ndc_2d_M_inv is the inverse of `ndc_M` with uniform z-components,
                     # not `ndc_M` itself. This is ok because we only use the `M` matrix in
                     # this function to extract the x and y components of face vertices.
@@ -332,17 +330,24 @@ def rasterize_batch(
                     ndc_2d_M_inv,
                     ndc_p
                 )
+                is_inside = not torch.any(bc_screen < 0.)
 
                 # slow distance culling: check if pixel is too far from sample point
-                if sq_dist > sq_blur_radius:
+                if not is_inside and sq_dist > sq_blur_radius:
                     continue
 
-                # Get perspective-correct barycentric coordinates by un-doing the
-                # perspective projection on the screen-space barycentrics.
-                bc = torch.nn.functional.normalize(bc_screen / clip_v012_w.T[0], dim=0, p=1) # [3]
+                # Get perspective-correct barycentric coordinates for the point to sample from
+                # by un-doing the perspective projection on the screen-space barycentrics.
+                sample_bc = torch.nn.functional.normalize(
+                    # If p is inside the triangle, sample from p itself.
+                    # Otherwise, sample from the point inside the triangle nearest to p.
+                    (bc_screen if is_inside else bc_edge_screen)
+                    / clip_v012_w.T[0],
+                    dim=0, p=1
+                ) # [3]
 
                 # Get normalized depth of nearest points in NDC-space.
-                z = bc @ ndc_depths # Range [-1, +1] where -1 is near plane
+                z = sample_bc @ ndc_depths # Range [-1, +1] where -1 is near plane
                 # Map to range (0, 1) where 1.0 is near plane, 0.0 is far plane
                 z = 0.5 - z/2.
 
@@ -351,7 +356,7 @@ def rasterize_batch(
                     continue
 
                 soft_colors[i, :3] = compute_shaded_color(
-                    bc,
+                    sample_bc,
                     triangle,
                     ### vertex attributes
                     world_space_vertices,
