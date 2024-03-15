@@ -2,6 +2,8 @@
 
 This package contains a differentiable, 3D mesh renderer using the barycentric formulation from Genova, Kyle, et al. "Unsupervised training for 3d morphable model regression." It is a port of Google's [tf_mesh_renderer](https://github.com/google/tf_mesh_renderer) to PyTorch.
 
+There is an optimized C++ implementation of this renderer available for use. To enable it, first install the kernel via `cd src/mesh_renderer/kernel && python setup.py install`, then change the hardcoded config variable `USE_CPP_RASTERIZER` as described in the [mesh_renderer docs](https://github.com/andrewkchan/pytorch_mesh_renderer/blob/master/src/mesh_renderer/README.md).
+
 # Testing
 
 To test the rasterizer module, run from the repository root:

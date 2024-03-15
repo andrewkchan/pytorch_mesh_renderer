@@ -9,7 +9,6 @@ This repository contains implementations of two differentiable 3D mesh renderers
 1. Create a virtual environment with `python3 -m venv env`
 2. Activate it with `source env/bin/activate`
 3. Install external dependencies with `pip install -r requirements.txt`
-4. To use the C++ implementation, first install the kernel via `cd src/mesh_renderer/kernel && python setup.py install`, then change the hardcoded config variable `USE_CPP_RASTERIZER` as described in the [mesh_renderer docs](https://github.com/andrewkchan/pytorch_mesh_renderer/blob/master/src/mesh_renderer/README.md).
 
 # Testing
 
