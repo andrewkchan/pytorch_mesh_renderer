@@ -64,10 +64,14 @@ def rasterize(
 
     Returns:
         A 4D float32 tensor of shape [batch_size, image_height, image_width, 4]
-        containing the lit RGBA color values for each image at each pixel. RGB
-        colors are the intensity values before tonemapping and can be in the range
-        [0, infinity]. Alpha values are near one for completely covered pixels and
-        will fall off farther away from triangles according to the sigma_val parameter.
+        containing the lit RGBA color values for each image at each pixel.
+        The RGB values are aggregated per-pixel according to the color aggregation
+        formula in [1].
+        The alpha values are aggregated per-pixel according to the silhouette
+        formula in [1].
+
+    [1] Shichen Liu et al, 'Soft Rasterizer: A Differentiable Renderer for
+    Image-based 3D Reasoning'
 
     Raises:
         ValueError: An invalid argument to the method is detected.
@@ -260,7 +264,7 @@ def rasterize_batch(
         containing the lit RGBA color values at each pixel.
         The RGB values are aggregated per-pixel according to the color aggregation
         formula in [1].
-        The alpha values are aggregared per-pixel according to the silhouette
+        The alpha values are aggregated per-pixel according to the silhouette
         formula in [1].
 
     [1] Shichen Liu et al, 'Soft Rasterizer: A Differentiable Renderer for

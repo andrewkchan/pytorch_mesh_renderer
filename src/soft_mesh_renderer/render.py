@@ -23,7 +23,7 @@ def compute_vertex_normals(vertices, triangles):
         triplet is an xyz position in world space.
       triangles: 2D int32 tensor with shape [triangle_count, 3].
 
-    Returns: 
+    Returns:
     - A tensor with shape [batch_size, vertex_count, 3] providing per-vertex normal
       vectors.
     """
@@ -83,7 +83,7 @@ def render(
       camera_up: 2D tensor with shape [batch_size, 3] or 1D tensor with shape
         [3] containing the up direction for the camera. The camera will have
         no tilt with respect to this direction.
-      light_positions: a 3D tensor with shape [batch_size, light_count, 3]. The 
+      light_positions: a 3D tensor with shape [batch_size, light_count, 3]. The
         world space XYZ position of each light in the scene.
       light_intensities: a 3D tensor with shape [batch_size, light_count].
         The intensity values for each light. Intensities may be above 1.
@@ -91,8 +91,8 @@ def render(
       image_height: int specifying desired output image height in pixels.
       sigma_val: parameter controlling the sharpness of the coverage distribution
         for a single triangle. A smaller sigma leads to a sharper distribution.
-      gamma_val: temperature parameter controlling uniformity of the triangle 
-        probability distribution for a pixel in the depth aggregation. 
+      gamma_val: temperature parameter controlling uniformity of the triangle
+        probability distribution for a pixel in the depth aggregation.
         When gamma is 0, all probability mass will fall into the triangle
         with highest z, matching the behavior of z-buffering.
       fov_y: float, 0D tensor, or 1D tensor with shape [batch_size] specifying
@@ -103,11 +103,15 @@ def render(
         specifying far clipping plane distance.
 
     Returns:
-      A 4D float32 tensor of shape [batch_size, image_height, image_width, 4]
-      containing the lit RGBA color values for each image at each pixel. RGB
-      colors are the intensity values before tonemapping and can be in the range
-      [0, infinity]. Alpha values are near one for completely covered pixels and
-      will fall off farther away from triangles according to the sigma_val parameter.
+        A 4D float32 tensor of shape [batch_size, image_height, image_width, 4]
+        containing the lit RGBA color values for each image at each pixel.
+        The RGB values are aggregated per-pixel according to the color aggregation
+        formula in [1].
+        The alpha values are aggregated per-pixel according to the silhouette
+        formula in [1].
+
+    [1] Shichen Liu et al, 'Soft Rasterizer: A Differentiable Renderer for
+    Image-based 3D Reasoning'
     Raises:
       ValueError: An invalid argument to the method is detected.
     """
@@ -176,7 +180,7 @@ def render(
     normals = compute_vertex_normals(vertices, triangles)
 
     return rasterize(
-        vertices, 
+        vertices,
         triangles,
         ### vertex attributes
         normals,
@@ -185,9 +189,9 @@ def render(
         light_positions,
         light_intensities,
         ###
-        clip_space_transforms, 
-        image_width, 
-        image_height, 
-        sigma_val, 
+        clip_space_transforms,
+        image_width,
+        image_height,
+        sigma_val,
         gamma_val
     )
