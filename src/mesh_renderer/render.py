@@ -41,6 +41,7 @@ def render(
         triangle's normal points toward the viewer if the forward order of the
         triplet defines a clockwise winding of the vertices. Gradients with
         respect to this tensor are not available.
+        # TODO: make this use CCW ordering to be consistent with soft_mesh_renderer
       normals: 3D float32 tensor with shape [batch_size, vertex_count, 3]. Each
         triplet is the xyz vertex normal for its corresponding vertex. Each
         vector is assumed to be already normalized.

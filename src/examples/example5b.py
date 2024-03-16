@@ -1,5 +1,5 @@
 """
-Example 5: Optimizing rotation of a cube.
+Example 5b: Optimizing rotation of a cube with the soft rasterizer.
 """
 
 import os
@@ -11,7 +11,7 @@ from skimage import io
 import imageio
 import matplotlib.pyplot as plt
 
-from .. import mesh_renderer as mr
+from .. import soft_mesh_renderer as smr
 from ..common import camera_utils
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
@@ -19,12 +19,13 @@ data_dir = os.path.join(current_dir, '.')
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('-t', '--filename_target', type=str, default=os.path.join(data_dir, '../mesh_renderer/test_data/Gray_Cube_0.png'))
-    parser.add_argument('-o', '--filename_output', type=str, default=os.path.join(data_dir, 'example5.mp4'))
+
+    parser.add_argument('-t', '--filename_target', type=str, default=os.path.join(data_dir, 'example5b_target.png'))
+    parser.add_argument('-o', '--filename_output', type=str, default=os.path.join(data_dir, 'example5b.mp4'))
     args = parser.parse_args()
 
-    image_width = 640
-    image_height = 480
+    image_width = 100
+    image_height = 100
 
     # Set up a basic cube centered at the origin, with vertex normals pointing
     # outwards along the line from the origin to the cube vertices:
@@ -32,10 +33,21 @@ if __name__ == "__main__":
         [[-1, -1, 1], [-1, -1, -1], [-1, 1, -1], [-1, 1, 1], [1, -1, 1],
         [1, -1, -1], [1, 1, -1], [1, 1, 1]],
         dtype=torch.float32)
-    cube_normals = torch.nn.functional.normalize(cube_vertices, dim=1, p=2)
     cube_triangles = torch.tensor(
-        [[0, 1, 2], [2, 3, 0], [3, 2, 6], [6, 7, 3], [7, 6, 5], [5, 4, 7],
-            [4, 5, 1], [1, 0, 4], [5, 6, 2], [2, 1, 5], [7, 4, 0], [0, 3, 7]],
+        [
+            [2, 1, 0],
+            [0, 3, 2],
+            [6, 2, 3],
+            [3, 7, 6],
+            [5, 6, 7],
+            [7, 4, 5],
+            [1, 5, 4],
+            [4, 0, 1],
+            [2, 6, 5],
+            [5, 1, 2],
+            [0, 4, 7],
+            [7, 3, 0]
+        ],
         dtype=torch.int32)
 
     initial_euler_angles = [[0.0, 0.0, 0.0]]
@@ -48,10 +60,6 @@ if __name__ == "__main__":
             torch.matmul(cube_vertices, model_rotation.T),
             [1, 8, 3])
 
-        normals_world_space = torch.reshape(
-            torch.matmul(cube_normals, model_rotation.T),
-            [1, 8, 3])
-
         # camera position:
         eye = torch.tensor([[0.0, 0.0, 6.0]], dtype=torch.float32)
         center = torch.tensor([[0.0, 0.0, 0.0]], dtype=torch.float32)
@@ -59,15 +67,29 @@ if __name__ == "__main__":
 
         vertex_diffuse_colors = torch.ones_like(vertices_world_space, dtype=torch.float32)
         light_positions = torch.reshape(eye, [1, 1, 3])
-        light_intensities = torch.ones([1, 1, 3], dtype=torch.float32)
+        light_intensities = torch.ones([1, 1], dtype=torch.float32)
 
-        render = mr.render(
-            vertices_world_space, cube_triangles, normals_world_space,
-            vertex_diffuse_colors, eye, center, world_up, light_positions,
-            light_intensities, image_width, image_height)
+        render = smr.render(
+            vertices_world_space,
+            cube_triangles,
+            vertex_diffuse_colors,
+            eye,
+            center,
+            world_up,
+            light_positions,
+            light_intensities,
+            image_width,
+            image_height,
+        )
         render = torch.reshape(render, [image_height, image_width, 4])
         return render
 
+    """
+    Target was generated with:
+    ```
+    target_euler_angles = torch.tensor([[-20.0, 0.0, 60.0]])
+    ```
+    """
     target_render = torch.tensor(
         io.imread(args.filename_target).astype(float) / 255.0
     ) # [image_width, image_height, 4]

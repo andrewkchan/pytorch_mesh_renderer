@@ -54,6 +54,12 @@ if __name__ == "__main__":
         image_height
     )
     render = torch.reshape(render, [image_height, image_width, 4])
+    # Binarize the alpha channel to 0 or 1. In the raw output of the soft renderer,
+    # it represents the probability that a triangle occupies the pixel. This will be
+    # less than 1.0 for any pixel which is not entirely covered by a triangle, even if
+    # the pixel is technically completely covered when considering all triangles. If we
+    # don't binarize the value, we will get seams in the output along triangle edges.
+    render[..., 3] = 1.0 * (render[..., 3] > 0.0)
     result_image = render.numpy()
     result_image = np.clip(result_image, 0., 1.).copy(order="C")
 

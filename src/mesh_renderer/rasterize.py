@@ -41,6 +41,7 @@ def rasterize(world_space_vertices, attributes, triangles,
             triangle's normal points toward the viewer if the forward order of
             the triplet defines a clockwise winding of the vertices. Gradients
             with respect to this tensor are not available.
+            # TODO: make this use CCW ordering to be consistent with soft_mesh_renderer
         camera_matrices: 3D float tensor with shape [batch_size, 4, 4] containing
             model-view-perspective projection matrices.
         image_width: int specifying desired output image width in pixels.
@@ -80,6 +81,7 @@ def rasterize_clip_space(clip_space_vertices, attributes, triangles,
             triangle's normal points toward the viewer if the forward order of
             the triplet defines a clockwise winding of the vertices. Gradients
             with respect to this tensor are not available.
+            # TODO: make this use CCW ordering to be consistent with soft_mesh_renderer
         image_width: int specifying desired output image width in pixels.
         image_height: int specifying desired output image height in pixels.
         background_value: a 1D float32 tensor with shape [attribute_count].
