@@ -9,6 +9,7 @@ from __future__ import print_function
 import torch
 
 from ..common import camera_utils
+from .quadtree import QuadTreeNode, contains
 
 def rasterize(
     world_space_vertices,
@@ -276,6 +277,7 @@ def rasterize_batch(
     ndc_face_matrices = torch.zeros([len(triangles), 3, 3], dtype=torch.float32)
     ndc_2d_face_matrices_inv = torch.zeros([len(triangles), 3, 3], dtype=torch.float32)
     ndc_face_areas = torch.zeros([len(triangles)], dtype=torch.float32)
+    quadtree = QuadTreeNode(torch.tensor([[-1., -1.], [1., 1.]]), 0)
     for i in range(len(triangles)):
         triangle = triangles[i]
         clip_v012 = clip_space_vertices[triangle] # shape: [3, 4]
@@ -294,6 +296,11 @@ def rasterize_batch(
             continue
         ndc_2d_face_matrices_inv[i, :, :] = ndc_2d_M_inv
         ndc_face_areas[i] = edge_function(ndc_M[:, 0], ndc_M[:, 1], ndc_M[:, 2])
+        ndc_bbox = torch.tensor([
+            [torch.min(ndc_M[0, :]) - blur_radius, torch.min(ndc_M[1, :]) - blur_radius],
+            [torch.max(ndc_M[0, :]) + blur_radius, torch.max(ndc_M[1, :]) + blur_radius]
+        ])
+        quadtree.insert(ndc_bbox, i)
 
     total_samples = 0
     for y in range(image_height):
@@ -311,7 +318,7 @@ def rasterize_batch(
             soft_colors = torch.zeros([len(triangles), 3])
 
             samples_drawn = 0
-            for i in range(len(triangles)):
+            for triangle_bbox, i in quadtree.leaf_for_point(ndc_p[:2]).data:
                 triangle = triangles[i]
 
                 clip_v012 = clip_space_vertices[triangle] # shape: [3, 4]
@@ -328,10 +335,7 @@ def rasterize_batch(
 
                 # fast distance culling: check if pixel is outside the
                 # triangle's bounding box inflated by blur_radius
-                if (ndc_x < torch.min(ndc_M[0, :]) - blur_radius or
-                    ndc_x > torch.max(ndc_M[0, :]) + blur_radius or
-                    ndc_y < torch.min(ndc_M[1, :]) - blur_radius or
-                    ndc_y > torch.max(ndc_M[1, :]) + blur_radius):
+                if not contains(triangle_bbox, ndc_p[:2]):
                     continue
                 bc_screen, sq_dist, bc_edge_screen = barycentric_edge(
                     # Note: ndc_2d_M_inv is the inverse of `ndc_M` with uniform z-components,
