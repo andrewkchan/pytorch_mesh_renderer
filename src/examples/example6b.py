@@ -33,10 +33,9 @@ if __name__ == "__main__":
     image_height = 100
 
     # load obj file
-    vertices, triangles, normals = obj_utils.load_obj(args.filename_input)
+    vertices, triangles, _ = obj_utils.load_obj(args.filename_input)
     vertices = vertices[None,:,:] # [num_vertices, 3] -> [batch_size=1, num_vertices, 3]
     # TODO why are triangles not batched?
-    normals = normals[None,:,:] # [num_vertices, 3] -> [batch_size=1, num_vertices, 3]
 
     # camera position:
     eye = torch.tensor([[0.0, 3.0, 3.0]], dtype=torch.float32)
