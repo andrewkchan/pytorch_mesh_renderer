@@ -12,7 +12,7 @@ import imageio
 import matplotlib.pyplot as plt
 
 from .. import mesh_renderer as mr
-from ..common import camera_utils
+from ..common import camera_utils, shapes
 
 current_dir = os.path.dirname(os.path.realpath(__file__))
 data_dir = os.path.join(current_dir, '.')
@@ -28,15 +28,8 @@ if __name__ == "__main__":
 
     # Set up a basic cube centered at the origin, with vertex normals pointing
     # outwards along the line from the origin to the cube vertices:
-    cube_vertices = torch.tensor(
-        [[-1, -1, 1], [-1, -1, -1], [-1, 1, -1], [-1, 1, 1], [1, -1, 1],
-        [1, -1, -1], [1, 1, -1], [1, 1, 1]],
-        dtype=torch.float32)
-    cube_normals = torch.nn.functional.normalize(cube_vertices, dim=1, p=2)
-    cube_triangles = torch.tensor(
-        [[0, 1, 2], [2, 3, 0], [3, 2, 6], [6, 7, 3], [7, 6, 5], [5, 4, 7],
-            [4, 5, 1], [1, 0, 4], [5, 6, 2], [2, 1, 5], [7, 4, 0], [0, 3, 7]],
-        dtype=torch.int32)
+    cube_vertices, cube_triangles, cube_normals = shapes.cube(2.)
+    cube_triangles = torch.flip(cube_triangles, [1]) # CCW -> CW
 
     initial_euler_angles = [[0.0, 0.0, 0.0]]
     euler_angles = torch.tensor(initial_euler_angles, requires_grad=True)
