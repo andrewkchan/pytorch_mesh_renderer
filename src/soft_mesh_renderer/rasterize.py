@@ -25,7 +25,8 @@ def rasterize(
     image_width,
     image_height,
     sigma_val,
-    gamma_val
+    gamma_val,
+    blur_radius=0.01
 ):
     """
     Soft-rasterize a mesh, interpolating vertex attributes, lighting with phong shading,
@@ -62,6 +63,8 @@ def rasterize(
             probability distribution for a pixel in the depth aggregation.
             When gamma is 0, all probability mass will fall into the triangle
             with highest z, matching the behavior of z-buffering.
+        blur_radius: float specifying the cutoff radius of soft-rasterization sampling
+            in NDC-space.
 
     Returns:
         A 4D float32 tensor of shape [batch_size, image_height, image_width, 4]

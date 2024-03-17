@@ -25,6 +25,7 @@ def render(
     image_height,
     sigma_val=1e-5,
     gamma_val=1e-4,
+    blur_radius=0.01,
     fov_y=40.0,
     near_clip=0.01,
     far_clip=10.0):
@@ -60,6 +61,8 @@ def render(
         probability distribution for a pixel in the depth aggregation.
         When gamma is 0, all probability mass will fall into the triangle
         with highest z, matching the behavior of z-buffering.
+      blur_radius: float specifying the cutoff radius of soft-rasterization sampling
+            in NDC-space.
       fov_y: float, 0D tensor, or 1D tensor with shape [batch_size] specifying
         desired output image y field of view in degrees.
       near_clip: float, 0D tensor, or 1D tensor with shape [batch_size]
