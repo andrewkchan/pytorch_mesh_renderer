@@ -1,6 +1,7 @@
 import os
-
 import torch
+
+from . import meshes
 
 def load_obj(filename, normalize=True):
     """
@@ -36,28 +37,34 @@ def load_obj(filename, normalize=True):
                 print("warning: encountered a face with more than 3 vertices," +
                     "extra vertices will be skipped")
             faces.append([int(face_vertex.split('/')[0]) for face_vertex in face_vertices[:3]])
-            for face_vertex in face_vertices[:3]:
-                parts = face_vertex.split('/')
-                vertex_id = int(parts[0]) - 1
-                normal_id = int(parts[2]) - 1
-                if vertex_id not in vertex_id_to_normals:
-                    vertex_id_to_normals[vertex_id] = []
-                vertex_id_to_normals[vertex_id].append(normal_id)
+            if len(face_vertices[0].split('/')) > 2:
+                # handle face-vertex normal spec: `f v1//vn1 v2//vn2 v3//vn3`
+                for face_vertex in face_vertices[:3]:
+                    parts = face_vertex.split('/')
+                    vertex_id = int(parts[0]) - 1
+                    normal_id = int(parts[2]) - 1
+                    if vertex_id not in vertex_id_to_normals:
+                        vertex_id_to_normals[vertex_id] = []
+                    vertex_id_to_normals[vertex_id].append(normal_id)
 
     vertices = torch.tensor(vertices, dtype=torch.float32)
+    faces = torch.tensor(faces, dtype=torch.int32) - 1
     all_normals = torch.tensor(all_normals, dtype=torch.float32)
     normals = torch.zeros_like(vertices)
-    # average all face-vertex normals to a single normal vector per vertex
-    for i in range(len(vertices)):
-        if i not in vertex_id_to_normals:
-            normals[i] = torch.ones(3)
-            continue
-        n = len(vertex_id_to_normals[i])
-        for j in vertex_id_to_normals[i]:
-            normals[i] += all_normals[j] / n
-    # normalize normal vectors
-    normals = torch.nn.functional.normalize(normals, p=2.0, dim=1)
-    faces = torch.tensor(faces, dtype=torch.int32) - 1
+
+    if len(vertex_id_to_normals) == 0:
+        normals = meshes.compute_vertex_normals(
+            vertices[None, :, :], faces)[0]
+    else:
+        # average all face-vertex normals to a single normal vector per vertex
+        for i in range(len(vertices)):
+            if i not in vertex_id_to_normals:
+                normals[i] = torch.ones(3)
+                continue
+            n = len(vertex_id_to_normals[i])
+            for j in vertex_id_to_normals[i]:
+                normals[i] += all_normals[j] / n
+        normals = torch.nn.functional.normalize(normals, p=2.0, dim=1)
 
     if normalize:
         # normalize into a unit cube centered around zero
