@@ -69,13 +69,13 @@ def look_at(eye, center, world_up):
         err_msg="Camera matrix is degenerate because eye and center are close.")
     forward = forward/forward_norm
 
-    to_side = torch.cross(forward, world_up)
+    to_side = torch.cross(forward, world_up, dim=-1)
     to_side_norm = torch.linalg.norm(to_side, ord=None, dim=1, keepdim=True).clone()
     np.testing.assert_array_less(vector_degeneracy_cutoff, to_side_norm,
         err_msg="Camera matrix is degenerate because up and gaze are too close "
                 "or because up is degenerate.")
     to_side = to_side/to_side_norm
-    cam_up = torch.cross(to_side, forward)
+    cam_up = torch.cross(to_side, forward, dim=-1)
 
     w_column = torch.tensor(
         batch_size * [[0., 0., 0., 1.]], dtype=torch.float32) # [batch_size, 4]

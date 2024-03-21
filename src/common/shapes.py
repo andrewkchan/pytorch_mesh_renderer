@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 
-def sphere(radius):
+def sphere(radius, resolution=25):
     """
     Creates a triangle mesh representing a sphere with the given radius.
     The mesh will be centered on the origin.
@@ -28,7 +28,7 @@ def sphere(radius):
     #
     # The poles then connect to the adjacent latitude lines via the longitude lines.
     # Each pair of adjacent longitude lines (phi) forms a triangle.
-    K = 50
+    K = resolution
     phi_step = 2.*np.pi/K
     theta_step = np.pi/(K+1)
     num_vertices = K**2 + 2
